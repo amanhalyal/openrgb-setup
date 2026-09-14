@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+
+set -u
+
+profile="${1:-}"
+configuration="/home/aman/.config/OpenRGB/Configuration.json"
+server_unit="app-openrgb@autostart.service"
+
+if [[ -z "$profile" || ! -s "$profile" ]]; then
+    printf 'Usage: %s PROFILE.json\n' "$0" >&2
+    exit 2
+fi
+
+if [[ ! -s "$configuration" ]]; then
+    printf 'OpenRGB controller configuration is missing: %s\n' "$configuration" >&2
+    exit 1
+fi
+
+# OpenRGB 1.0 can report a successful profile load without touching hardware.
+# Validate the saved layout, then translate the profile into ordinary device
+# commands, which are confirmed to work on these controllers.
+layout_filter='[.controllers[] | {
+    name,
+    location,
+    zones: [.zones[] | {name, leds_count}],
+    leds_count: (.leds | length)
+}]'
+profile_layout="$(/usr/bin/jq -c "$layout_filter" "$profile" 2>/dev/null)"
+cached_layout="$(/usr/bin/jq -c "$layout_filter" "$configuration" 2>/dev/null)"
+if [[ -z "$profile_layout" || "$profile_layout" != "$cached_layout" ]]; then
+    printf 'Controller layout mismatch in %s\n' "$profile" >&2
+    exit 1
+fi
+
+controller_count="$(/usr/bin/jq -er '.controllers | length' "$profile" 2>/dev/null)"
+if [[ ! "$controller_count" =~ ^[1-9][0-9]*$ ]]; then
+    printf 'Profile contains no controllers: %s\n' "$profile" >&2
+    exit 1
+fi
+
+declare -a controller_arguments controller_names
+for ((controller_index = 0; controller_index < controller_count; controller_index++)); do
+    controller_name="$(/usr/bin/jq -er ".controllers[$controller_index].name" "$profile" 2>/dev/null)"
+    controller_names[$controller_index]="$controller_name"
+    mode="$(/usr/bin/jq -er ".controllers[$controller_index] | .modes[.active_mode].name" "$profile" 2>/dev/null)"
+    if [[ -z "$controller_name" || -z "$mode" ]]; then
+        printf 'Controller %d has no active mode in %s\n' "$controller_index" "$profile" >&2
+        exit 1
+    fi
+
+    controller_arguments[$controller_index]=""
+
+    # Off is a hardware mode on the ENE DIMMs and does not take colors. Other
+    # current profiles use Direct mode, for which the complete per-LED color
+    # array preserves the JSON profile rather than reducing it to one color.
+    if [[ "${mode,,}" != "off" ]]; then
+        color_csv=""
+        while IFS= read -r packed_color; do
+            if [[ ! "$packed_color" =~ ^[0-9]+$ ]]; then
+                printf 'Invalid color for controller %d in %s\n' "$controller_index" "$profile" >&2
+                exit 1
+            fi
+            red=$((packed_color & 255))
+            green=$(((packed_color >> 8) & 255))
+            blue=$(((packed_color >> 16) & 255))
+            printf -v color '%02X%02X%02X' "$red" "$green" "$blue"
+            color_csv+="${color_csv:+,}${color}"
+        done < <(/usr/bin/jq -r ".controllers[$controller_index].colors[]" "$profile")
+
+        if [[ -z "$color_csv" ]]; then
+            printf 'Controller %d has no colors in %s\n' "$controller_index" "$profile" >&2
+            exit 1
+        fi
+
+        # The Gigabyte IT5711 accepts Direct writes but does not consistently
+        # update its two onboard zones in that mode.  A uniform Direct profile
+        # is equivalent to Static and Static reliably updates both the ARGB
+        # headers and onboard LEDs on this controller.
+        unique_color_count="$(/usr/bin/jq -er ".controllers[$controller_index].colors | unique | length" "$profile" 2>/dev/null)"
+        if [[ "${mode,,}" == "direct" && "$unique_color_count" == 1 ]]; then
+            color_csv="${color_csv%%,*}"
+            if [[ "$controller_name" == "B850 GAMING X WIFI6E" ]]; then
+                mode="Static"
+            fi
+        fi
+
+        controller_arguments[$controller_index]="--mode|$mode|--color|$color_csv"
+    else
+        controller_arguments[$controller_index]="--mode|$mode"
+    fi
+done
+
+restart_server() {
+    /usr/bin/systemctl --user start "$server_unit" >/dev/null 2>&1 || true
+}
+
+/usr/bin/systemctl --user stop "$server_unit" >/dev/null 2>&1 || true
+trap restart_server EXIT
+
+status=0
+output=""
+for ((controller_index = 0; controller_index < controller_count; controller_index++)); do
+    # Both ENE DIMMs were physically verified when selected together in one
+    # process. A fresh detector process per DIMM can reinitialize the other
+    # stick, so combine consecutive ENE controllers in a single invocation.
+    if [[ "${controller_names[$controller_index]}" == "ENE DRAM" ]]; then
+        operation=(--device "$controller_index")
+        IFS='|' read -r -a controller_operation <<<"${controller_arguments[$controller_index]}"
+        operation+=("${controller_operation[@]}")
+        while (( controller_index + 1 < controller_count )) && [[ "${controller_names[$((controller_index + 1))]}" == "ENE DRAM" ]]; do
+            ((controller_index += 1))
+            operation+=(--device "$controller_index")
+            IFS='|' read -r -a controller_operation <<<"${controller_arguments[$controller_index]}"
+            operation+=("${controller_operation[@]}")
+        done
+        operation_output="$(timeout 30 /usr/bin/openrgb --noautoconnect "${operation[@]}" 2>&1)"
+    else
+        IFS='|' read -r -a operation <<<"${controller_arguments[$controller_index]}"
+        operation_output="$(timeout 30 /usr/bin/openrgb --noautoconnect --device "$controller_index" "${operation[@]}" 2>&1)"
+    fi
+    operation_status=$?
+    [[ -n "$operation_output" ]] && printf '%s\n' "$operation_output"
+    output+="${output:+$'\n'}$operation_output"
+    if (( operation_status != 0 )) || /usr/bin/grep -qiE '(^|[^[:alpha:]])(error|failed)([^[:alpha:]]|$)' <<<"$operation_output"; then
+        status="$operation_status"
+        (( status == 0 )) && status=1
+        break
+    fi
+done
+
+restart_server
+trap - EXIT
+
+if (( status != 0 )) || /usr/bin/grep -qiE '(^|[^[:alpha:]])(error|failed)([^[:alpha:]]|$)' <<<"$output"; then
+    printf 'Direct profile application failed (status %d): %s\n' "$status" "$profile" >&2
+    exit 1
+fi
+
+exit 0

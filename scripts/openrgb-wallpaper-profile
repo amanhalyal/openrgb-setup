@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+set -u
+
+wallpaper_path="${1:-}"
+if [[ -z "$wallpaper_path" ]]; then
+    wallpaper_path="$(timeout 5 /usr/bin/noctalia msg wallpaper-get 2>/dev/null | head -n 1)"
+fi
+
+# Map wallpaper filenames to saved OpenRGB profiles. Add future mappings here.
+case "${wallpaper_path##*/}" in
+    tori_gate.jpg)
+        profile="/home/aman/.config/OpenRGB/profiles/tori-blue.json"
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+
+if [[ ! -f "$profile" ]]; then
+    /usr/bin/logger -t openrgb-wallpaper "profile not found: $profile"
+    exit 1
+fi
+
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+state_file="$runtime_dir/openrgb-wallpaper-profile.current"
+
+exec 9>"$runtime_dir/openrgb-wallpaper-profile.lock"
+/usr/bin/flock -n 9 || exit 0
+
+if [[ "${OPENRGB_FORCE:-0}" != 1 ]] && [[ -f "$state_file" ]] && [[ "$(<"$state_file")" == "$profile" ]]; then
+    exit 0
+fi
+
+# At login this hook races the XDG autostart entry.  Let the server complete its
+# initial scan before asking it to load the selected profile.
+server_unit="app-openrgb@autostart.service"
+/usr/bin/systemctl --user start "$server_unit" >/dev/null 2>&1
+
+server_pid="$(/usr/bin/systemctl --user show --property MainPID --value "$server_unit")"
+if [[ ! "$server_pid" =~ ^[1-9][0-9]*$ ]]; then
+    /usr/bin/logger -t openrgb-wallpaper "OpenRGB server did not start"
+    exit 1
+fi
+
+# Normal detection currently takes about 1.5 seconds, but the first scan after
+# boot can take longer.  Wait until the server process is at least five seconds
+# old without delaying ordinary wallpaper changes on an established session.
+server_age="$(/usr/bin/ps -o etimes= -p "$server_pid" 2>/dev/null | /usr/bin/tr -d ' ')"
+if [[ "$server_age" =~ ^[0-9]+$ ]] && (( server_age < 5 )); then
+    /usr/bin/sleep "$((5 - server_age))"
+fi
+
+output="$(timeout 40 /home/aman/.local/bin/openrgb-apply-profile "$profile" 2>&1)"
+status=$?
+[[ -n "$output" ]] && printf '%s\n' "$output"
+
+if (( status != 0 )); then
+    /usr/bin/logger -t openrgb-wallpaper "failed to apply ${profile##*/} for ${wallpaper_path##*/} (status $status): ${output//$'\n'/; }"
+    exit 1
+fi
+
+printf '%s\n' "$profile" >"$state_file"
+/usr/bin/logger -t openrgb-wallpaper "applied ${profile##*/} for ${wallpaper_path##*/}"
+exit 0
