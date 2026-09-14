@@ -5,11 +5,13 @@ Uses SDK v6's device/mode/LED API. No hardware names, colors or mode
 substitutions. Unsupported profile features fail before any writes.
 """
 import argparse
+import ctypes
 import fcntl
 import json
 import os
 from pathlib import Path
 import re
+import signal
 import socket
 import struct
 import sys
@@ -17,6 +19,20 @@ import time
 
 FIELDS = ('flags speed_min speed_max brightness_min brightness_max '
           'colors_min colors_max speed brightness direction color_mode').split()
+HARDWARE_SETTLE_SECONDS = 0.75
+I2C_SLAVE = 0x0703
+ENE_MODE_VALUES = {
+    'Off': 0,
+    'Static': 1,
+    'Breathing': 2,
+    'Flashing': 3,
+    'Spectrum Cycle': 4,
+    'Rainbow': 5,
+    'Chase Fade': 7,
+    'Chase': 9,
+    'Random Flicker': 13,
+    'Double Fade': 14,
+}
 
 
 def pack(fmt, *values):
@@ -218,18 +234,91 @@ def mode_bytes(mode):
             + pack('H', len(mode['colors'])) + pack('I' * len(mode['colors']), *mode['colors']))
 
 
+def ene_target(saved, mode, colors):
+    """Return expected ENE hardware registers, or None for other devices."""
+    match = re.search(r'\((/dev/i2c-\d+)\), address (0x[0-9a-fA-F]+)$', saved['location'])
+    if saved['name'] != 'ENE DRAM' or not match:
+        return None
+    if not saved.get('version', '').startswith('AUDA0-'):
+        raise ValueError(f"Unsupported ENE hardware verification: {saved.get('version', 'unknown')}")
+    target = {
+        'path': match.group(1),
+        'address': int(match.group(2), 16),
+        'location': saved['location'],
+        'direct': mode['name'] == 'Direct',
+    }
+    if target['direct']:
+        target['colors'] = b''.join(bytes((color & 0xFF,
+                                          (color >> 16) & 0xFF,
+                                          (color >> 8) & 0xFF)) for color in colors)
+    else:
+        if mode['name'] not in ENE_MODE_VALUES:
+            raise ValueError(f"Unknown ENE mode for hardware verification: {mode['name']}")
+        value = ENE_MODE_VALUES[mode['name']]
+        if mode['color_mode'] == 3:
+            value = {'Breathing': 6, 'Chase Fade': 8, 'Chase': 10}.get(mode['name'], value)
+        target['mode'] = value
+        if mode['color_mode'] == 1:
+            target['colors'] = b''.join(bytes((color & 0xFF,
+                                              (color >> 16) & 0xFF,
+                                              (color >> 8) & 0xFF)) for color in colors)
+    return target
+
+
+def verify_ene_hardware(targets):
+    """Verify physical ENE registers while the OpenRGB process is quiesced."""
+    if not targets:
+        return
+    server_pid = int(os.environ['OPENRGB_SERVER_PID'])
+    os.kill(server_pid, signal.SIGSTOP)
+    try:
+        library = ctypes.CDLL('libi2c.so.0', use_errno=True)
+        for target in targets:
+            fd = os.open(target['path'], os.O_RDWR)
+            try:
+                fcntl.ioctl(fd, I2C_SLAVE, target['address'])
+
+                def read(register):
+                    swapped = (register >> 8) | ((register & 0xFF) << 8)
+                    if library.i2c_smbus_write_word_data(fd, 0, swapped) < 0:
+                        raise OSError(ctypes.get_errno(), 'ENE register selection failed')
+                    value = library.i2c_smbus_read_byte_data(fd, 0x81)
+                    if value < 0:
+                        raise OSError(ctypes.get_errno(), 'ENE register read failed')
+                    return value
+
+                direct = read(0x8020)
+                if direct != int(target['direct']):
+                    raise ValueError(f"ENE Direct-mode hardware mismatch: {target['location']}")
+                if not target['direct'] and read(0x8021) != target['mode']:
+                    raise ValueError(f"ENE mode hardware mismatch: {target['location']}")
+                if 'colors' in target:
+                    base = 0x8100 if target['direct'] else 0x8160
+                    actual = bytes(read(base + offset) for offset in range(len(target['colors'])))
+                    if actual != target['colors']:
+                        raise ValueError(f"ENE color hardware mismatch: {target['location']}")
+            finally:
+                os.close(fd)
+            print(f"Verified ENE hardware: {target['location']}")
+    finally:
+        os.kill(server_pid, signal.SIGCONT)
+
+
 def apply(client, operations):
+    ene_targets = []
     for index, saved, mode_index, mode, colors, zone_modes in operations:
         mode_data = pack('i', mode_index) + mode_bytes(mode)
         client.request(index, 1101, pack('I', len(mode_data) + 4) + mode_data, ack=True)
-        # Mode updates are asynchronous. Keep the hardware-owning server alive
-        # and allow mode switching before sending its per-LED color buffer.
-        time.sleep(0.15)
+        # SDK acknowledgements precede the asynchronous hardware write. Never
+        # overlap that write with a color or another controller operation.
+        time.sleep(HARDWARE_SETTLE_SECONDS)
         for zone_index, zi, zm in zone_modes:
             data = pack('ii', zone_index, zi) + (mode_bytes(zm) if zm else b'')
             client.request(index, 1103, pack('I', len(data) + 4) + data, ack=True)
+            time.sleep(HARDWARE_SETTLE_SECONDS)
         color_data = pack('H', len(colors)) + pack('I' * len(colors), *colors)
         client.request(index, 1050, pack('I', len(color_data) + 4) + color_data, ack=True)
+        time.sleep(HARDWARE_SETTLE_SECONDS)
         deadline = time.monotonic() + 3
         while True:
             actual = client.controller(index)
@@ -246,8 +335,14 @@ def apply(client, operations):
             if time.monotonic() >= deadline:
                 raise ValueError(f"State readback mismatch: {saved['name']} {saved['location']}")
             time.sleep(0.1)
-        print(f"Verified server state: {saved['name']} ({saved['location']}): {mode['name']}, {len(colors)} LEDs")
-    time.sleep(0.3)
+        # Use the live location because Linux I2C device numbers can change at
+        # boot even when the saved controller identity still matches.
+        target = ene_target(actual, mode, colors)
+        if target:
+            ene_targets.append(target)
+        print(f"Verified OpenRGB state: {saved['name']} ({saved['location']}): {mode['name']}, {len(colors)} LEDs")
+    time.sleep(HARDWARE_SETTLE_SECONDS)
+    verify_ene_hardware(ene_targets)
 
 
 def main():

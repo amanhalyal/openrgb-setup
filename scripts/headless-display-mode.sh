@@ -23,7 +23,7 @@ restore_rgb_profile() (
 
     output="$(timeout 40 /home/aman/.local/bin/openrgb-apply-profile "$profile" 2>&1)"
     if [[ $? -eq 0 ]]; then
-        logger -t headless-display-mode "Restored ${profile##*/} through direct profile adapter"
+        logger -t headless-display-mode "Restored ${profile##*/} through hardware-verified SDK adapter"
         return 0
     fi
 

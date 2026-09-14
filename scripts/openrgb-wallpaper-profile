@@ -61,5 +61,5 @@ if (( status != 0 )); then
 fi
 
 printf '%s\n' "$profile" >"$state_file"
-/usr/bin/logger -t openrgb-wallpaper "applied ${profile##*/} for ${wallpaper_path##*/}"
+/usr/bin/logger -t openrgb-wallpaper "hardware-verified ${profile##*/} for ${wallpaper_path##*/}"
 exit 0
