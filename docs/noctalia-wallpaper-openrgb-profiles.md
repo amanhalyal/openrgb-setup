@@ -22,8 +22,8 @@ Noctalia provides two hooks in `~/.config/noctalia/config.toml`:
 
 ```toml
 [hooks]
-started = "/home/aman/.local/bin/openrgb-wallpaper-profile"
-wallpaper_changed = "/home/aman/.local/bin/openrgb-wallpaper-profile \"$NOCTALIA_WALLPAPER_PATH\""
+started = "/home/YOUR_USER/.local/bin/openrgb-wallpaper-profile"
+wallpaper_changed = "/home/YOUR_USER/.local/bin/openrgb-wallpaper-profile \"$NOCTALIA_WALLPAPER_PATH\""
 ```
 
 The `started` hook synchronizes RGB with the restored wallpaper at login. The
@@ -86,19 +86,17 @@ under `~/.config/OpenRGB/profile-layout-backup-20260913-1130/`.
 The wallpaper helper now:
 
 1. Starts `app-openrgb@autostart.service` if necessary.
-2. At login, waits until the server has had five seconds to detect hardware.
+2. Waits until the server exposes the complete saved controller layout.
 3. Calls `~/.local/bin/openrgb-apply-profile`, which compares controller names,
    locations, zones, and LED counts between the selected profile and OpenRGB's
    current controller cache.
-4. The adapter translates every controller's saved mode and complete per-LED
-   color array into ordinary device commands under exclusive hardware access.
-   It writes the two ENE DIMMs together using one color for a uniform profile,
-   matching the physically verified RAM command. The motherboard is written
-   in a separate process. For a uniform Direct profile, the Gigabyte IT5711 is
-   written in equivalent Static mode so its onboard zones update along with
-   the ARGB headers.
-5. Writes the state marker only after the translated command succeeds without
-   OpenRGB error output.
+4. The adapter writes mode, zone, and color updates sequentially through the
+   persistent SDK server, allowing each asynchronous hardware operation to
+   settle before the next one.
+5. Verifies both ENE DIMMs through their physical SMBus registers and writes
+   the state marker only after verification succeeds. The versioned profiles
+   store uniform motherboard colors in Static mode so the IT5711 retains them
+   across its onboard LEDs and ARGB headers.
 
 ## Confirmed OpenRGB 1.0 profile-loading regression
 
@@ -145,18 +143,16 @@ failure is specifically in OpenRGB 1.0 profile application.
 ## Generic profile adapter
 
 The installed compatibility layer keeps JSON profiles as the source of truth
-and generically translates each matched controller's saved mode and per-LED
-colors into normal OpenRGB device commands. It:
+and applies each matched controller through the persistent SDK server. It:
 
-1. Validate profile/controller identity and layout before writing.
-2. Stop the SDK server for exclusive access and always restore it with a trap.
-3. Resolve duplicate controller names deterministically using validated profile
-   order/location, rather than embedding Tori-specific device assumptions.
-4. Reject OpenRGB's exit-zero `Error:` output.
-5. Write the session state marker only after every translated device operation
-   succeeds.
-6. Uses the same implementation for `purple`, `off`, Tori Blue, and future
-   profiles with the same supported mode/color representation.
+1. Validates profile/controller identity and layout before writing.
+2. Resolves duplicate controller names using their stable locations.
+3. Serializes mode, zone, color, and controller updates with a hardware settle
+   interval between them.
+4. Verifies SDK readback and the physical ENE mode/color registers.
+5. Writes the session state marker only after every check succeeds.
+6. Uses the same implementation for Purple, Off, Tori Blue, and future profiles
+   with the same supported mode/color representation.
 
 The adapter is also the single restore engine used by
 `headless-display-mode.sh`, preventing the boot/wallpaper and idle paths from
@@ -172,15 +168,14 @@ for both DIMMs and the motherboard, and it used the saved Direct mode for the
 IT5711. Both behaviors are unreliable on this controller combination despite a
 zero exit status.
 
-The first attempted correction started one process per controller, which fixed
-the motherboard but not the RAM. The durable RAM path now exactly matches the
-earlier physically verified control test: both ENE devices are selected in one
-process and a uniform Direct array is reduced to its single repeated color.
-This avoids a fresh detector process reinitializing the other DIMM. The
-motherboard remains a separate operation and uses Static for a uniform Direct
-profile on `B850 GAMING X WIFI6E`; this is visually equivalent and is the mode
-previously confirmed to update its ARGB headers and onboard LEDs. Tori Blue was
-force-applied after the change and the tray/server was restored successfully.
+Source inspection showed that the standalone CLI queues its mode change but
+immediately performs the LED write. ENE logical register operations themselves
+use separate register-select and data transfers, so overlapping operations can
+partially program or wedge a DIMM. The durable adapter keeps one server in sole
+ownership, waits between writes, and verifies physical ENE registers. The
+versioned motherboard profiles use Static for uniform colors because that mode
+reliably updates and retains the IT5711 ARGB headers and onboard LEDs. Tori Blue
+was force-applied after the change and all three controllers verified.
 
 ## OpenRGB settings required by this design
 
@@ -216,10 +211,10 @@ Edit the `case` statement in `~/.local/bin/openrgb-wallpaper-profile`:
 ```bash
 case "${wallpaper_path##*/}" in
     tori_gate.jpg)
-        profile="/home/aman/.config/OpenRGB/profiles/tori-blue.json"
+        profile="$profile_dir/tori-blue.json"
         ;;
     another-wallpaper.jpg)
-        profile="/home/aman/.config/OpenRGB/profiles/another-profile.json"
+        profile="$profile_dir/another-profile.json"
         ;;
     *)
         exit 0

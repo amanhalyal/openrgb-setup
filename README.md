@@ -55,12 +55,27 @@ profile; an OpenRGB exit code or cached SDK state alone is insufficient.
 | --- | --- |
 | `scripts/` | Active wallpaper, idle, and profile entry points |
 | `src/` | OpenRGB SDK profile adapter and ENE hardware verification |
+| `profiles/` | Versioned Tori Blue, Purple, and Off hardware profiles |
+| `config/` | Validated detector settings and motherboard zone layout |
+| `systemd/` | System shutdown unit |
 | `docs/` | Setup notes, incident records, and recovery procedures |
 | `misc/` | Preserved scripts from before the SDK migration |
 
 The live hooks retain their original paths under `~/.local/bin`. Those paths
 are symlinks into this repository, so operational edits are tracked by Git
 without requiring changes to Noctalia's configuration.
+
+Create those compatibility links after cloning:
+
+```bash
+mkdir -p ~/.local/bin ~/.config/OpenRGB/profiles
+for script in openrgb-apply-profile openrgb-wallpaper-profile headless-display-mode.sh idle-off-check.sh; do
+  ln -sfn "$PWD/scripts/$script" "$HOME/.local/bin/$script"
+done
+for profile in tori-blue purple off; do
+  ln -sfn "$PWD/profiles/$profile.json" "$HOME/.config/OpenRGB/profiles/$profile.json"
+done
+```
 
 ## Applying a profile
 
@@ -89,10 +104,11 @@ when controller mapping, OpenRGB state, or ENE hardware verification fails.
 
 ## Adding a wallpaper profile
 
-Save the profile as JSON under `~/.config/OpenRGB/profiles/`, then add its
-wallpaper filename to the `case` statement in
-`scripts/openrgb-wallpaper-profile`. Profiles are matched to live controllers
-by type, name, and stable location information before any write occurs.
+Save the profile under `profiles/`, link it into
+`~/.config/OpenRGB/profiles/`, then add its wallpaper filename to the `case`
+statement in `scripts/openrgb-wallpaper-profile`. Profiles are matched to live
+controllers by type, name, and stable location information before any write
+occurs.
 
 ## Requirements
 
@@ -104,6 +120,23 @@ by type, name, and stable location information before any write occurs.
 
 This is a machine-specific operational repository. Review device names,
 addresses, paths, and zone layouts before adapting it to another computer.
+
+### Tested configuration
+
+- OpenRGB `1.0-2.1`, SDK protocol v6
+- Linux `7.2.4` with `i2c-dev` and `i2c-piix4`
+- ENE `AUDA0-E6K5-0101` DDR5 lighting controllers
+- Gigabyte IT5711 motherboard controller
+
+The physical ENE verification currently supports `AUDA0-*` controllers using
+the version-2 color registers. Unknown ENE hardware is rejected before it can
+be reported as verified.
+
+> [!CAUTION]
+> RGB memory control uses the SMBus shared with DDR5 support devices. Do not
+> run another RGB or SMBus control program concurrently. Preserve a cold-power
+> recovery path and adapt the hardware checks before using this on a different
+> ENE controller family.
 
 ## Documentation
 
@@ -120,3 +153,8 @@ machine down and remove PSU power until all motherboard lighting is off. A warm
 reboot may leave the lighting controller powered and will not necessarily clear
 the fault. The incident and confirmed fix are documented in
 [`docs/ene-dram-apply-race-20260914.md`](docs/ene-dram-apply-race-20260914.md).
+
+## License
+
+Copyright © 2026 Aman Halyal. Licensed under the
+[GNU General Public License v2.0 or later](LICENSE).

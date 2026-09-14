@@ -1,0 +1,2008 @@
+{
+    "controllers": [
+        {
+            "active_mode": 0,
+            "colors": [
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735
+            ],
+            "description": "ENE SMBus Device",
+            "display_name": "",
+            "flags": 1,
+            "leds": [
+                {
+                    "name": "DRAM LED 1"
+                },
+                {
+                    "name": "DRAM LED 2"
+                },
+                {
+                    "name": "DRAM LED 3"
+                },
+                {
+                    "name": "DRAM LED 4"
+                },
+                {
+                    "name": "DRAM LED 5"
+                },
+                {
+                    "name": "DRAM LED 6"
+                },
+                {
+                    "name": "DRAM LED 7"
+                },
+                {
+                    "name": "DRAM LED 8"
+                }
+            ],
+            "location": "I2C: SMBus PIIX4 adapter port 0 at 0b00 (/dev/i2c-6), address 0x71",
+            "modes": [
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 32,
+                    "name": "Direct",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 0,
+                    "name": "Off",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 32,
+                    "name": "Static",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 161,
+                    "name": "Breathing",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 33,
+                    "name": "Flashing",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 1,
+                    "name": "Spectrum Cycle",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 3,
+                    "name": "Rainbow",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 163,
+                    "name": "Chase Fade",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 163,
+                    "name": "Chase",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 1,
+                    "name": "Random Flicker",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                }
+            ],
+            "name": "ENE DRAM",
+            "serial": "",
+            "type": 1,
+            "vendor": "ENE",
+            "version": "AUDA0-E6K5-0101",
+            "zones": [
+                {
+                    "display_name": "",
+                    "flags": 4096,
+                    "leds_count": 8,
+                    "leds_max": 8,
+                    "leds_min": 8,
+                    "matrix_map": {
+                        "height": 0,
+                        "width": 0
+                    },
+                    "name": "DRAM",
+                    "type": 1
+                }
+            ]
+        },
+        {
+            "active_mode": 0,
+            "colors": [
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735
+            ],
+            "description": "ENE SMBus Device",
+            "display_name": "",
+            "flags": 1,
+            "leds": [
+                {
+                    "name": "DRAM LED 1"
+                },
+                {
+                    "name": "DRAM LED 2"
+                },
+                {
+                    "name": "DRAM LED 3"
+                },
+                {
+                    "name": "DRAM LED 4"
+                },
+                {
+                    "name": "DRAM LED 5"
+                },
+                {
+                    "name": "DRAM LED 6"
+                },
+                {
+                    "name": "DRAM LED 7"
+                },
+                {
+                    "name": "DRAM LED 8"
+                }
+            ],
+            "location": "I2C: SMBus PIIX4 adapter port 0 at 0b00 (/dev/i2c-6), address 0x73",
+            "modes": [
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 32,
+                    "name": "Direct",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 0,
+                    "name": "Off",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 32,
+                    "name": "Static",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 161,
+                    "name": "Breathing",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 33,
+                    "name": "Flashing",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 1,
+                    "name": "Spectrum Cycle",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 3,
+                    "name": "Rainbow",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 163,
+                    "name": "Chase Fade",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 163,
+                    "name": "Chase",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                },
+                {
+                    "brightness": 0,
+                    "brightness_max": 0,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 1,
+                    "name": "Random Flicker",
+                    "speed": 2,
+                    "speed_max": 0,
+                    "speed_min": 4
+                }
+            ],
+            "name": "ENE DRAM",
+            "serial": "",
+            "type": 1,
+            "vendor": "ENE",
+            "version": "AUDA0-E6K5-0101",
+            "zones": [
+                {
+                    "display_name": "",
+                    "flags": 4096,
+                    "leds_count": 8,
+                    "leds_max": 8,
+                    "leds_min": 8,
+                    "matrix_map": {
+                        "height": 0,
+                        "width": 0
+                    },
+                    "name": "DRAM",
+                    "type": 1
+                }
+            ]
+        },
+        {
+            "active_mode": 1,
+            "colors": [
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735,
+                16711735
+            ],
+            "description": "IT5711-GIGABYTE V1.0.29.6",
+            "display_name": "",
+            "flags": 131073,
+            "leds": [
+                {
+                    "name": "ARGB_V2_1, LED 1"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 2"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 3"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 4"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 5"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 6"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 7"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 8"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 9"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 10"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 11"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 12"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 13"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 14"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 15"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 16"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 17"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 18"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 19"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 20"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 21"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 22"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 23"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 24"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 25"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 26"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 27"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 28"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 29"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 30"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 31"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 32"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 33"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 34"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 35"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 36"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 37"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 38"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 39"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 40"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 41"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 42"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 43"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 44"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 45"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 46"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 47"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 48"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 49"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 50"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 51"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 52"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 53"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 54"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 55"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 56"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 57"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 58"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 59"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 60"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 61"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 62"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 63"
+                },
+                {
+                    "name": "ARGB_V2_1, LED 64"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 1"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 2"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 3"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 4"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 5"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 6"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 7"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 8"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 9"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 10"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 11"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 12"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 13"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 14"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 15"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 16"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 17"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 18"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 19"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 20"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 21"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 22"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 23"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 24"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 25"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 26"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 27"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 28"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 29"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 30"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 31"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 32"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 33"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 34"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 35"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 36"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 37"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 38"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 39"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 40"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 41"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 42"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 43"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 44"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 45"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 46"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 47"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 48"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 49"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 50"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 51"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 52"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 53"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 54"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 55"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 56"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 57"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 58"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 59"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 60"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 61"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 62"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 63"
+                },
+                {
+                    "name": "ARGB_V2_2, LED 64"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 1"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 2"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 3"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 4"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 5"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 6"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 7"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 8"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 9"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 10"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 11"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 12"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 13"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 14"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 15"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 16"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 17"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 18"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 19"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 20"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 21"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 22"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 23"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 24"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 25"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 26"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 27"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 28"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 29"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 30"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 31"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 32"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 33"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 34"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 35"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 36"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 37"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 38"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 39"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 40"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 41"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 42"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 43"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 44"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 45"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 46"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 47"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 48"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 49"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 50"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 51"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 52"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 53"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 54"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 55"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 56"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 57"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 58"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 59"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 60"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 61"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 62"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 63"
+                },
+                {
+                    "name": "ARGB_V2_3, LED 64"
+                },
+                {
+                    "name": "Chipset Accent"
+                },
+                {
+                    "name": "LED_C"
+                }
+            ],
+            "location": "HID: /dev/hidraw9",
+            "modes": [
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 1,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 48,
+                    "name": "Direct",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 2,
+                    "colors": [
+                        16711735
+                    ],
+                    "colors_max": 1,
+                    "colors_min": 1,
+                    "direction": 0,
+                    "flags": 336,
+                    "name": "Static",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 100,
+                    "brightness_max": 100,
+                    "brightness_min": 0,
+                    "color_mode": 2,
+                    "colors": [
+                        0
+                    ],
+                    "colors_max": 1,
+                    "colors_min": 1,
+                    "direction": 0,
+                    "flags": 465,
+                    "name": "Breathing",
+                    "speed": 4,
+                    "speed_max": 0,
+                    "speed_min": 9
+                },
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 2,
+                    "colors": [
+                        0
+                    ],
+                    "colors_max": 1,
+                    "colors_min": 1,
+                    "direction": 0,
+                    "flags": 465,
+                    "name": "Flashing",
+                    "speed": 4,
+                    "speed_max": 0,
+                    "speed_min": 9
+                },
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 273,
+                    "name": "Color Cycle",
+                    "speed": 4,
+                    "speed_max": 0,
+                    "speed_min": 9
+                },
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 2,
+                    "colors": [
+                        0
+                    ],
+                    "colors_max": 1,
+                    "colors_min": 1,
+                    "direction": 0,
+                    "flags": 465,
+                    "name": "Double Flash",
+                    "speed": 4,
+                    "speed_max": 0,
+                    "speed_min": 9
+                },
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 272,
+                    "name": "Random",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 1296,
+                    "name": "Wave 1",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 1296,
+                    "name": "Wave 2",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 1296,
+                    "name": "Wave 3",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                },
+                {
+                    "brightness": 255,
+                    "brightness_max": 255,
+                    "brightness_min": 0,
+                    "color_mode": 0,
+                    "colors_max": 0,
+                    "colors_min": 0,
+                    "direction": 0,
+                    "flags": 1296,
+                    "name": "Wave 4",
+                    "speed": 0,
+                    "speed_max": 0,
+                    "speed_min": 0
+                }
+            ],
+            "name": "B850 GAMING X WIFI6E",
+            "serial": "0x5711C000",
+            "type": 0,
+            "vendor": "Gigabyte",
+            "version": "1.0.29.6",
+            "zones": [
+                {
+                    "active_mode": -1,
+                    "display_name": "",
+                    "flags": 4158,
+                    "leds_count": 64,
+                    "leds_max": 256,
+                    "leds_min": 0,
+                    "matrix_map": {
+                        "height": 0,
+                        "width": 0
+                    },
+                    "modes": [
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 1,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 48,
+                            "name": "Direct",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 336,
+                            "name": "Static",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 100,
+                            "brightness_max": 100,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Breathing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Flashing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 273,
+                            "name": "Color Cycle",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Double Flash",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 272,
+                            "name": "Random",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        }
+                    ],
+                    "name": "ARGB_V2_1",
+                    "type": 1
+                },
+                {
+                    "active_mode": -1,
+                    "display_name": "",
+                    "flags": 4158,
+                    "leds_count": 64,
+                    "leds_max": 256,
+                    "leds_min": 0,
+                    "matrix_map": {
+                        "height": 0,
+                        "width": 0
+                    },
+                    "modes": [
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 1,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 48,
+                            "name": "Direct",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 336,
+                            "name": "Static",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 100,
+                            "brightness_max": 100,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Breathing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Flashing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 273,
+                            "name": "Color Cycle",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Double Flash",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 272,
+                            "name": "Random",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        }
+                    ],
+                    "name": "ARGB_V2_2",
+                    "type": 1
+                },
+                {
+                    "active_mode": -1,
+                    "display_name": "",
+                    "flags": 4158,
+                    "leds_count": 64,
+                    "leds_max": 256,
+                    "leds_min": 0,
+                    "matrix_map": {
+                        "height": 0,
+                        "width": 0
+                    },
+                    "modes": [
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 1,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 48,
+                            "name": "Direct",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 336,
+                            "name": "Static",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 100,
+                            "brightness_max": 100,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Breathing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Flashing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 273,
+                            "name": "Color Cycle",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Double Flash",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 272,
+                            "name": "Random",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        }
+                    ],
+                    "name": "ARGB_V2_3",
+                    "type": 1
+                },
+                {
+                    "active_mode": -1,
+                    "display_name": "",
+                    "flags": 0,
+                    "leds_count": 1,
+                    "leds_max": 1,
+                    "leds_min": 1,
+                    "matrix_map": {
+                        "height": 0,
+                        "width": 0
+                    },
+                    "modes": [
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 1,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 48,
+                            "name": "Direct",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 336,
+                            "name": "Static",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 100,
+                            "brightness_max": 100,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Breathing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Flashing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 273,
+                            "name": "Color Cycle",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Double Flash",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 272,
+                            "name": "Random",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        }
+                    ],
+                    "name": "Chipset Accent",
+                    "type": 0
+                },
+                {
+                    "active_mode": -1,
+                    "display_name": "",
+                    "flags": 0,
+                    "leds_count": 1,
+                    "leds_max": 1,
+                    "leds_min": 1,
+                    "matrix_map": {
+                        "height": 0,
+                        "width": 0
+                    },
+                    "modes": [
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 1,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 48,
+                            "name": "Direct",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 336,
+                            "name": "Static",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        },
+                        {
+                            "brightness": 100,
+                            "brightness_max": 100,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Breathing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Flashing",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 273,
+                            "name": "Color Cycle",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 2,
+                            "colors": [
+                                0
+                            ],
+                            "colors_max": 1,
+                            "colors_min": 1,
+                            "direction": 0,
+                            "flags": 465,
+                            "name": "Double Flash",
+                            "speed": 4,
+                            "speed_max": 0,
+                            "speed_min": 9
+                        },
+                        {
+                            "brightness": 255,
+                            "brightness_max": 255,
+                            "brightness_min": 0,
+                            "color_mode": 0,
+                            "colors_max": 0,
+                            "colors_min": 0,
+                            "direction": 0,
+                            "flags": 272,
+                            "name": "Random",
+                            "speed": 0,
+                            "speed_max": 0,
+                            "speed_min": 0
+                        }
+                    ],
+                    "name": "LED_C",
+                    "type": 0
+                }
+            ]
+        }
+    ],
+    "profile_name": "purple",
+    "profile_version": 6
+}

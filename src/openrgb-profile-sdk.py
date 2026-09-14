@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Apply saved controller state through a persistent OpenRGB SDK server.
 
 Uses SDK v6's device/mode/LED API. No hardware names, colors or mode
@@ -113,7 +114,9 @@ def parse_controller(data):
 
 class Client:
     def __init__(self):
-        self.sock = socket.create_connection(('127.0.0.1', 6742), timeout=3)
+        host = os.environ.get('OPENRGB_SDK_HOST', '127.0.0.1')
+        port = int(os.environ.get('OPENRGB_SDK_PORT', '6742'))
+        self.sock = socket.create_connection((host, port), timeout=3)
         version = struct.unpack('<I', self.request(0, 40, pack('I', 6)))[0]
         if version < 6:
             raise ValueError('OpenRGB SDK version 6 or newer required')

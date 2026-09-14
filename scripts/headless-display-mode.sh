@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 set -u
 
 # Toggle only desktop presentation resources. Local LLM inference remains active.
-STATE_DIR="/home/aman/.cache/headless-display-mode"
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+script_dir="$(dirname -- "$script_path")"
+STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/headless-display-mode"
 RGB_SNAPSHOT="$STATE_DIR/pre-headless.orp"
 SNAPSHOT_TMP="$RGB_SNAPSHOT.tmp"
 SNAPSHOT_FILE="${SNAPSHOT_TMP}.orp"
 ACTIVE_MARKER="$STATE_DIR/active"
+PROFILE_DIR="${OPENRGB_PROFILE_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/OpenRGB/profiles}"
+
+session_is_locked() {
+    local status
+
+    status="$(timeout 5 /usr/bin/noctalia msg status 2>/dev/null)" || return 1
+    /usr/bin/jq -e '.locked == true' <<<"$status" >/dev/null
+}
 
 restore_rgb_profile() (
     local profile="$1"
@@ -21,7 +32,7 @@ restore_rgb_profile() (
         return 1
     fi
 
-    output="$(timeout 40 /home/aman/.local/bin/openrgb-apply-profile "$profile" 2>&1)"
+    output="$(timeout 40 "$script_dir/openrgb-apply-profile" "$profile" 2>&1)"
     if [[ $? -eq 0 ]]; then
         logger -t headless-display-mode "Restored ${profile##*/} through hardware-verified SDK adapter"
         return 0
@@ -33,6 +44,13 @@ restore_rgb_profile() (
 
 case "${1:-}" in
     off)
+        # Noctalia can replay the locked_timeout action shortly after unlock.
+        # Ignore that stale callback so it cannot overwrite a restored profile.
+        if ! session_is_locked; then
+            logger -t headless-display-mode "Ignored RGB-off request because the session is unlocked"
+            exit 0
+        fi
+
         mkdir -p "$STATE_DIR"
         if [[ ! -e "$ACTIVE_MARKER" ]]; then
             # OpenRGB appends .orp to the name supplied to --save-profile.
@@ -58,18 +76,10 @@ case "${1:-}" in
             touch "$ACTIVE_MARKER"
         fi
         /usr/bin/noctalia msg dpms-off
-        # Apply hardware off/black modes directly. The migrated JSON off profile
-        # is not sufficient for the Gigabyte IT5711/ARGB chain, and the DRAM
-        # controllers expose a native Off mode that is more reliable here.
-        if ! /usr/bin/openrgb --noautoconnect \
-            --device 0 --mode off \
-            --device 1 --mode off \
-            --device "B850 GAMING X WIFI6E" --zone 0 --size 64 --mode direct --color 000000 \
-            --device "B850 GAMING X WIFI6E" --zone 1 --size 64 --mode direct --color 000000 \
-            --device "B850 GAMING X WIFI6E" --zone 2 --size 64 --mode direct --color 000000 \
-            --device "B850 GAMING X WIFI6E" --zone 3 --size 64 --mode direct --color 000000 \
-            --device "B850 GAMING X WIFI6E" --mode static --color 000000 >/dev/null 2>&1; then
-            logger -t headless-display-mode "Direct RGB off application failed"
+        if ! restore_rgb_profile "$PROFILE_DIR/off.json"; then
+            logger -t headless-display-mode "RGB off application failed; restoring displays"
+            /usr/bin/noctalia msg dpms-on
+            exit 1
         fi
         ;;
     on)

@@ -1,0 +1,15 @@
+[Unit]
+Description=Turn off RGB lighting on shutdown
+DefaultDependencies=no
+Conflicts=shutdown.target
+Before=shutdown.target reboot.target halt.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/usr/bin/true
+ExecStop=/usr/local/libexec/openrgb-shutdown-off
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

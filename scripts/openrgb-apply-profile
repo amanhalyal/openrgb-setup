@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set -euo pipefail
 
 profile="${1:-}"
 server_unit="app-openrgb@autostart.service"
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+repository_dir="$(cd -- "$(dirname -- "$script_path")/.." && pwd)"
 
 if [[ -z "$profile" || ! -s "$profile" ]]; then
     printf 'Usage: %s PROFILE.json\n' "$0" >&2
@@ -21,5 +24,22 @@ if [[ ! "$server_pid" =~ ^[1-9][0-9]*$ ]]; then
 fi
 
 export OPENRGB_SERVER_PID="$server_pid"
+
+# systemd considers the GUI process started before its hardware scan finishes.
+# Wait for the saved controller layout to become visible before writing; this
+# also handles a server that was started moments ago by another hook.
+ready=0
+for _ in {1..40}; do
+    if /usr/bin/python3 "$repository_dir/src/openrgb-profile-sdk.py" --check "$profile" >/dev/null 2>&1; then
+        ready=1
+        break
+    fi
+    /usr/bin/sleep 0.5
+done
+if (( ready == 0 )); then
+    printf 'OpenRGB hardware scan did not produce the saved controller layout\n' >&2
+    exit 1
+fi
+
 exec /usr/bin/timeout 35 /usr/bin/python3 \
-    /home/aman/openrgb/src/openrgb-profile-sdk.py "$profile"
+    "$repository_dir/src/openrgb-profile-sdk.py" "$profile"

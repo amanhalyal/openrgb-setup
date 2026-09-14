@@ -12,10 +12,14 @@ Noctalia controls the idle sequence:
 1. After 600 seconds (10 minutes), lock the session.
 2. After 660 seconds (11 minutes), run the headless transition.
 3. The transition saves the active OpenRGB profile, powers down both displays
-   through DPMS, and directly applies hardware off/black modes to the RGB
-   controllers.
+   through DPMS, and applies the versioned Off profile through the serialized
+   SDK adapter.
 4. On input/unlock, displays and the saved RGB profile are restored through the
-   generic direct profile adapter.
+   same adapter.
+
+The off branch first asks Noctalia whether the session is still locked. This
+rejects a delayed idle callback after login before it can turn the restored
+lighting off again.
 
 The active configuration is in:
 
@@ -41,8 +45,8 @@ action = "command"
 enabled = true
 timeout = 660
 locked_timeout = 60
-command = "/home/aman/.local/bin/headless-display-mode.sh off"
-resume_command = "/home/aman/.local/bin/headless-display-mode.sh on"
+command = "/home/YOUR_USER/.local/bin/headless-display-mode.sh off"
+resume_command = "/home/YOUR_USER/.local/bin/headless-display-mode.sh on"
 ```
 
 The script uses:
@@ -54,8 +58,8 @@ The script uses:
 - `~/.local/bin/openrgb-apply-profile` to translate the saved JSON profile into
   ordinary device operations because OpenRGB 1.0's profile loader is broken on
   this hardware.
-- Direct hardware commands: native `off` for both DRAM controllers and resized
-  static-black zones for the Gigabyte B850 motherboard/ARGB chain.
+- `~/.config/OpenRGB/profiles/off.json`, with native `off` mode for both DRAM
+  controllers and Static black for the Gigabyte B850 motherboard/ARGB chain.
 - `$XDG_RUNTIME_DIR/openrgb-wallpaper-profile.lock` to serialize access with
   the wallpaper-profile helper.
 - `app-openrgb@autostart.service` for the OpenRGB tray and SDK server.
@@ -91,12 +95,26 @@ build migrated persistent profiles from legacy `.orp` files to JSON files under
 The idle helper still requested the old `~/.config/OpenRGB/off.orp` path. The
 headless transition therefore saved its restore snapshot but left the lights
 blue. Updating the path to `off.json` made OpenRGB report success, but the
-Gigabyte/ARGB chain still remained lit. The reliable solution is the direct
-hardware sequence now in `headless-display-mode.sh`: native DRAM `off` mode and
-static black across all motherboard ARGB zones.
+Gigabyte/ARGB chain still remained lit. The current profile stores native DRAM
+`off` mode and motherboard Static black and is applied through the SDK adapter.
 
 Persistent JSON profiles remain appropriate for wallpaper changes. Temporary
 restore snapshots remain `.orp` files by design.
+
+## Investigation record: 2026-09-14 — post-unlock overwrite
+
+After login from an inactive session, both DIMMs and one motherboard section
+restored, while the fan and AIO headers stayed dark. Forcing Tori Blue produced
+blue briefly and then returned the lighting to Off. Noctalia's log showed a
+second headless action about 60 seconds after resume, matching the configured
+`locked_timeout`. That delayed callback overwrote the restored profile.
+
+The off handler now refuses to act unless `noctalia msg status` reports
+`locked: true`. It also no longer starts a standalone OpenRGB process alongside
+the SDK server. Off, restore, and wallpaper changes all share the same profile
+lock and persistent SDK server. The three versioned profiles store the IT5711
+motherboard in Static mode because its Direct mode does not reliably retain a
+uniform color on the attached fan and AIO headers.
 
 The corrected direct sequence was rerun on 2026-09-12. OpenRGB detected both DRAM
 controllers and the B850 motherboard, returned exit code 0, and the lights were
@@ -148,9 +166,9 @@ OpenRGB exit status and the text `Profile loaded successfully` prove only that
 the software accepted the profile. For this controller, visible motherboard
 and ARGB output must also be checked.
 
-### IT5711 restore workaround
+### Superseded IT5711 restore workaround
 
-`~/.local/bin/headless-display-mode.sh on` now performs this sequence:
+The 2026-09-06 implementation performed this sequence:
 
 1. Acquire the shared OpenRGB profile lock.
 2. Stop `app-openrgb@autostart.service` to discard the stale IT5711 handle.
@@ -161,8 +179,8 @@ and ARGB output must also be checked.
 7. Remove `active` only after a successful restore. Otherwise, retain it so
    recovery remains retryable.
 
-An exit trap ensures the OpenRGB tray/server is restarted if the restore is
-interrupted.
+This restart-and-native-profile workaround was replaced by the serialized SDK
+adapter described below.
 
 During the repair, the legacy `tori-blue.orp` profile was applied after fresh
 detection and the live state was saved again. The repaired `pre-headless.orp`
@@ -179,10 +197,9 @@ loading; neither produced a visible change. Raw device commands did produce the
 visually confirmed Purple -> Off -> Tori Blue sequence.
 
 The durable fix is `~/.local/bin/openrgb-apply-profile`. It validates the saved
-controller layout, converts every controller's saved mode and packed per-LED
-colors into normal OpenRGB device arguments, stops the SDK server for exclusive
-access, and restores it using an exit trap. Both the wallpaper hook and idle
-resume handler use this adapter.
+controller layout, applies mode and color writes sequentially through one SDK
+server, verifies OpenRGB readback, and checks the physical ENE registers. Both
+the wallpaper hook and idle resume handler use this adapter.
 
 An idle restore simulation was completed at 12:50 on 2026-09-13: `off.json`
 was applied, the real `headless-display-mode.sh on` branch restored the saved

@@ -2,132 +2,79 @@
 
 ## Purpose
 
-Ensure RGB lighting is turned off before shutdown, including an AIO and fans
-connected to the motherboard ARGB headers.
+Turn off both ENE DRAM modules and the Gigabyte motherboard ARGB chain before
+shutdown, reboot, or halt. The attached fans and AIO follow the motherboard
+headers.
 
-## Shutdown hook
+## Active design
 
-The system-level unit is:
-
-```text
-/etc/systemd/system/openrgb-off.service
-```
-
-It is enabled and ordered before `shutdown.target`, `reboot.target`, and
-`halt.target`. Its shutdown action stops OpenRGB and directly applies hardware
-`off`/black modes to the configured controllers and motherboard zones.
-
-The persistent JSON profiles are available for wallpaper/manual use, but the
-idle path deliberately uses direct hardware commands because the migrated
-`off.json` profile did not reliably turn off the Gigabyte/ARGB chain.
+The system unit is installed at `/etc/systemd/system/openrgb-off.service` from
+`systemd/openrgb-off.service`. Its only stop action is:
 
 ```text
-/home/aman/.config/OpenRGB/profiles/off.json
+/usr/local/libexec/openrgb-shutdown-off
 ```
 
-Check the unit:
+That path is a symlink to `scripts/openrgb-shutdown-off`. The helper:
+
+1. Takes a system-level hardware lock.
+2. Terminates the desktop OpenRGB server so one process owns the controllers.
+3. Seeds a disposable config with the validated three-controller layout.
+4. Starts one isolated SDK server on port 6743.
+5. Waits until the complete saved layout is visible.
+6. Applies `profiles/off.json` with paced mode, zone, and color operations.
+7. Verifies both ENE controllers through their physical SMBus registers.
+8. Terminates the isolated server.
+
+The Off profile uses each DIMM's hardware Off mode and motherboard Static black
+across the 194 configured LEDs. Static mode persists reliably on the IT5711 and
+its fan/AIO headers; Direct black did not.
+
+## Why the old sequence was replaced
+
+The former unit killed OpenRGB and then launched seven standalone OpenRGB
+processes: one for the DIMMs, one for each motherboard zone, and a final Static
+write. Each process redetected and reinitialized the same hardware. OpenRGB 1.0
+can also overlap an asynchronous ENE mode update with its LED write, which can
+leave one DIMM partially programmed or wedged.
+
+The shutdown path now uses the same SDK adapter as wallpaper and idle profile
+changes. It has a separate server because the user session and its SDK server
+may already be stopping when the system unit runs.
+
+## Installation
+
+From the repository root:
 
 ```bash
-systemctl is-enabled openrgb-off.service
-systemctl status openrgb-off.service
-systemctl show openrgb-off.service -p Before,Conflicts,ExecStop,TimeoutStopUSec
+sudo install -d -m 0755 /usr/local/libexec
+sudo ln -sfn "$PWD/scripts/openrgb-shutdown-off" \
+  /usr/local/libexec/openrgb-shutdown-off
+sudo install -m 0644 systemd/openrgb-off.service \
+  /etc/systemd/system/openrgb-off.service
+sudo systemctl daemon-reload
+sudo systemctl enable openrgb-off.service
 ```
 
-Check its previous-run history:
+## Verification
+
+Test the helper while the machine is running, then restore the normal profile:
 
 ```bash
+sudo /usr/local/libexec/openrgb-shutdown-off
+scripts/openrgb-apply-profile profiles/tori-blue.json
+```
+
+The shutdown helper should report OpenRGB state for all three controllers and
+physical verification for both ENE DIMMs. Check the installed unit and earlier
+shutdown runs with:
+
+```bash
+systemctl show openrgb-off.service \
+  -p Before -p Conflicts -p ExecStop -p TimeoutStopUSec
 journalctl --no-pager -u openrgb-off.service -o short-iso
 ```
 
-## Current device mapping
-
-OpenRGB currently detects:
-
-- Device 0: ENE DRAM at I2C address `0x71`
-- Device 1: ENE DRAM at I2C address `0x73`
-- Device 2: Gigabyte B850 Gaming X WIFI6E motherboard
-
-The motherboard exposes the ARGB headers as:
-
-```text
-ARGB_V2_1
-ARGB_V2_2
-ARGB_V2_3
-ARGB_V2_4
-```
-
-The AIO and fans are connected to those headers, so device 2 is the relevant
-controller. The motherboard does not expose a native `Off` mode; use static
-black instead. The active idle path applies this directly rather than loading
-`off.json`; see `idle-display-rgb.md`.
-
-```bash
-openrgb --device 2 --mode static --color 000000
-```
-
-For the DRAM devices, use their supported off mode:
-
-```bash
-openrgb --device 0 --mode off
-openrgb --device 1 --mode off
-```
-
-## Investigation record: 2026-09-04
-
-The shutdown hook was verified from the previous boot:
-
-```text
-22:21:05  Stopping Turn off RGB lighting on shutdown
-22:21:08  Profile loaded successfully
-22:21:09  openrgb-off.service stopped
-```
-
-Therefore the off profile is being loaded before shutdown. OpenRGB does not
-detect a separate AIO controller; it only detects the motherboard and DRAM.
-If the AIO remains lit, the profile may not be forcing the motherboard ARGB
-zones to static black, or the AIO may retain its last hardware state after the
-USB/software controller exits.
-
-The explicit motherboard command was tested successfully while inactive:
-
-```text
-openrgb --device 2 --mode static --color 000000
-exit code: 0
-```
-
-This matters for the planned Fire Stick/presentation setup because the PC's
-display and RGB power policy is independent of any future HDMI streamer view.
-The Fire Stick should not be treated as the RGB or shutdown controller.
-
-## Recommended hardening
-
-If AIO lighting remains on after a future shutdown, update the shutdown action
-to explicitly apply the three device states rather than relying only on the
-profile:
-
-```sh
-/usr/bin/openrgb --device 0 --mode off
-/usr/bin/openrgb --device 1 --mode off
-/usr/bin/openrgb --device 2 --mode static --color 000000
-```
-
-Test the commands while the machine is running before changing the systemd
-unit. Do not edit the shutdown unit without preserving a backup and verifying
-its ordering afterward.
-
-For the broader Fire Stick architecture and the decision to keep backend
-services on Legion or Citadel, see
-`firestick-homelab-setup-and-scenarios.md`.
-
-## Useful checks
-
-```bash
-timeout 10 openrgb --list-devices
-openrgb --device 2 --mode static --color 000000
-journalctl --no-pager -u openrgb-off.service -o short-iso
-```
-
-For wallpaper-driven profile selection at login and during theme changes, see
-`noctalia-wallpaper-openrgb-profiles.md`. That mechanism deliberately disables
-OpenRGB's per-process exit profile; this system-level shutdown service remains
-responsible for turning the lights off.
+An Off to Tori Blue simulation passed on 2026-09-14. Both DIMMs verified in
+hardware Off mode, the motherboard accepted Static black for 194 LEDs, and the
+subsequent Tori restore verified both DIMMs and Static blue on the motherboard.
