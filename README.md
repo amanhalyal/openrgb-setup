@@ -1,25 +1,122 @@
-# Nexus OpenRGB configuration
+# OpenRGB Setup for Nexus
 
-This repository contains the scripts and operational notes used to manage
-OpenRGB lighting on Nexus.
+Reliable, wallpaper-aware RGB control for a Linux desktop with ENE DDR5 memory
+and a Gigabyte motherboard.
 
-## Layout
+This repository contains the scripts and investigation notes behind the live
+lighting setup on **Nexus**. It works around OpenRGB 1.0 profile-loading and
+ENE SMBus timing problems while keeping normal OpenRGB profiles as the source
+of truth.
 
-- `scripts/` — active wallpaper, idle, and profile entry points
-- `src/` — supporting implementations under development
-- `docs/` — setup, behavior, and troubleshooting notes
-- `misc/` — preserved pre-change copies and investigation artifacts
+## What it controls
 
-The active hooks continue to use paths under `~/.local/bin`. Those paths are
-symlinks into this repository so configuration changes can be reviewed and
-versioned here.
+- Two G.SKILL DDR5 modules exposed as ENE DRAM at `0x71` and `0x73`
+- A Gigabyte B850 Gaming X WIFI6E motherboard and its ARGB headers
+- Wallpaper-driven profile selection through Noctalia
+- Display-idle lighting shutdown and profile restoration
+- Lighting shutdown before system power-off
 
-## Current incident baseline
+## Why an adapter is needed
 
-On 2026-09-14, the ENE DRAM controller at I2C address `0x73` stopped producing
-light after repeated OpenRGB detection and mode changes. Its registers remained
-readable and contained the requested colors. A complete removal of PSU power
-reset the controller, after which both DIMMs returned to their default rainbow
-effect.
+OpenRGB 1.0 can report a successful profile application without fully updating
+this hardware. Its standalone CLI also races an asynchronous ENE mode change
+against a synchronous LED-buffer write. The result can be a partial color
+buffer, a profile that never leaves the default rainbow mode, or an ENE
+controller that requires complete PSU power removal to reset.
 
-No RGB profile was applied while creating this repository.
+The active adapter avoids that path:
+
+```text
+Noctalia wallpaper hook
+        │
+        ▼
+openrgb-wallpaper-profile
+        │ selects a saved JSON profile
+        ▼
+openrgb-apply-profile
+        │ uses the persistent SDK server
+        ▼
+serialized mode → settle → color → settle
+        │
+        ▼
+physical ENE register verification
+        │
+        ▼
+success marker written
+```
+
+Mode, zone, color, and controller operations are serialized. For the ENE DIMMs,
+success requires the physical mode and all LED color registers to match the
+profile; an OpenRGB exit code or cached SDK state alone is insufficient.
+
+## Repository layout
+
+| Path | Purpose |
+| --- | --- |
+| `scripts/` | Active wallpaper, idle, and profile entry points |
+| `src/` | OpenRGB SDK profile adapter and ENE hardware verification |
+| `docs/` | Setup notes, incident records, and recovery procedures |
+| `misc/` | Preserved scripts from before the SDK migration |
+
+The live hooks retain their original paths under `~/.local/bin`. Those paths
+are symlinks into this repository, so operational edits are tracked by Git
+without requiring changes to Noctalia's configuration.
+
+## Applying a profile
+
+Validate controller identity, layout, modes, and colors without writing:
+
+```bash
+python3 src/openrgb-profile-sdk.py --check \
+  ~/.config/OpenRGB/profiles/tori-blue.json
+```
+
+Apply and verify a profile through the running OpenRGB server:
+
+```bash
+scripts/openrgb-apply-profile \
+  ~/.config/OpenRGB/profiles/tori-blue.json
+```
+
+Force the current wallpaper mapping to run again:
+
+```bash
+OPENRGB_FORCE=1 scripts/openrgb-wallpaper-profile
+```
+
+The adapter exits unsuccessfully and does not update the wallpaper state marker
+when controller mapping, OpenRGB state, or ENE hardware verification fails.
+
+## Adding a wallpaper profile
+
+Save the profile as JSON under `~/.config/OpenRGB/profiles/`, then add its
+wallpaper filename to the `case` statement in
+`scripts/openrgb-wallpaper-profile`. Profiles are matched to live controllers
+by type, name, and stable location information before any write occurs.
+
+## Requirements
+
+- Linux with access to the relevant `/dev/i2c-*` and HID devices
+- OpenRGB 1.0 with SDK server protocol v6 enabled
+- Python 3
+- `libi2c`, `jq`, `flock`, and systemd user services
+- Noctalia for the wallpaper and idle hooks used by this setup
+
+This is a machine-specific operational repository. Review device names,
+addresses, paths, and zone layouts before adapting it to another computer.
+
+## Documentation
+
+- [Wallpaper-aware profiles](docs/noctalia-wallpaper-openrgb-profiles.md)
+- [ENE DRAM application race](docs/ene-dram-apply-race-20260914.md)
+- [Idle display and RGB behavior](docs/idle-display-rgb.md)
+- [Shutdown lighting](docs/shutdown-rgb-aio.md)
+- [Legacy idle implementation](docs/rgb-idle-lighting.md)
+
+## Recovery
+
+If an ENE DIMM remains dark while its registers are still accessible, shut the
+machine down and remove PSU power until all motherboard lighting is off. A warm
+reboot may leave the lighting controller powered and will not necessarily clear
+the fault. The incident and confirmed fix are documented in
+[`docs/ene-dram-apply-race-20260914.md`](docs/ene-dram-apply-race-20260914.md).
