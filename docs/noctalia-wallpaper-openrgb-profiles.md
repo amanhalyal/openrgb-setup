@@ -13,6 +13,7 @@ Noctalia's wallpaper directory is `~/Wallpapers`. The current mappings are:
 ```text
 tori_gate.jpg -> ~/.config/OpenRGB/profiles/tori-blue.json
 wallhaven-3q2783.jpg -> ~/.config/OpenRGB/profiles/cathedral-inferno.json
+wallhaven-5y57x8.png -> ~/.config/OpenRGB/profiles/white.json
 ```
 
 Wallpapers without a mapping leave the current RGB state unchanged.
@@ -239,30 +240,42 @@ The expected PC-lighting controllers are:
 
 ## Adding another wallpaper mapping
 
-Edit the `case` statement in `~/.local/bin/openrgb-wallpaper-profile`:
+Save the complete profile from OpenRGB's main profile control, then run:
 
 ```bash
-case "${wallpaper_path##*/}" in
-    tori_gate.jpg)
-        profile="$profile_dir/tori-blue.json"
-        ;;
-    wallhaven-3q2783.jpg)
-        profile="$profile_dir/cathedral-inferno.json"
-        ;;
-    another-wallpaper.jpg)
-        profile="$profile_dir/another-profile.json"
-        ;;
-    *)
-        exit 0
-        ;;
-esac
+openrgb-add-wallpaper-profile
 ```
 
-Save the OpenRGB profile and keep the generated persistent profile under
-`~/.config/OpenRGB/profiles/` with a `.json` suffix. OpenRGB 1.0 embeds Effects
-Plugin state in the profile's `plugins` object; do not split that state into a
-second wallpaper mapping. Do not update temporary restore snapshots such as
-`pre-headless.orp`; those are intentionally separate from persistent profiles.
+The first graphical picker starts in `~/Wallpapers`. The second starts in
+`~/.config/OpenRGB/profiles`, so the newly saved OpenRGB JSON can be selected
+directly. The wizard then:
+
+1. Validates that the selected files are an image and an OpenRGB 1.0 JSON
+   profile with at least one controller.
+2. Offers to copy an externally selected wallpaper into `~/Wallpapers`.
+3. Copies the JSON into the repository's `profiles/` directory without
+   overwriting a different file unless the user confirms.
+4. Replaces the runtime profile with a symlink to the versioned copy.
+5. Adds or replaces the wallpaper basename in
+   `config/wallpaper-profiles.tsv` using an atomic file update.
+6. Optionally applies and verifies the new mapping immediately.
+
+For automation or repeatable testing, bypass either picker with explicit paths:
+
+```bash
+openrgb-add-wallpaper-profile \
+  --wallpaper ~/Wallpapers/another-wallpaper.jpg \
+  --profile ~/.config/OpenRGB/profiles/another-profile.json \
+  --apply --yes
+```
+
+OpenRGB 1.0 embeds Effects Plugin state in the profile's `plugins` object; do
+not save or map a separate plugin-only profile. Temporary restore snapshots
+such as `pre-headless.orp` are intentionally separate from persistent profiles.
+
+Advanced users can edit `config/wallpaper-profiles.tsv` directly. Each
+non-comment line contains a wallpaper filename and profile filename separated
+by one tab. The hook rejects profile entries containing a path separator.
 
 ## Verification
 

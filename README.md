@@ -55,7 +55,7 @@ profile; an OpenRGB exit code or cached SDK state alone is insufficient.
 | `scripts/` | Active wallpaper, idle, and profile entry points |
 | `src/` | OpenRGB SDK profile adapter and ENE hardware verification |
 | `profiles/` | Versioned static and animated wallpaper profiles |
-| `config/` | Validated detector settings and motherboard zone layout |
+| `config/` | Detector settings, motherboard layout, and wallpaper mappings |
 | `systemd/` | System shutdown unit |
 | `docs/` | Setup notes, incident records, and recovery procedures |
 | `misc/` | Preserved scripts from before the SDK migration |
@@ -68,11 +68,11 @@ Create those compatibility links after cloning:
 
 ```bash
 mkdir -p ~/.local/bin ~/.config/OpenRGB/profiles
-for script in openrgb-apply-profile openrgb-wallpaper-profile headless-display-mode.sh idle-off-check.sh; do
+for script in openrgb-add-wallpaper-profile openrgb-apply-profile openrgb-wallpaper-profile headless-display-mode.sh idle-off-check.sh; do
   ln -sfn "$PWD/scripts/$script" "$HOME/.local/bin/$script"
 done
-for profile in tori-blue cathedral-inferno purple off; do
-  ln -sfn "$PWD/profiles/$profile.json" "$HOME/.config/OpenRGB/profiles/$profile.json"
+for profile in "$PWD"/profiles/*.json; do
+  ln -sfn "$profile" "$HOME/.config/OpenRGB/profiles/$(basename "$profile")"
 done
 ```
 
@@ -108,14 +108,32 @@ or ENE hardware verification fails.
 
 ## Adding a wallpaper profile
 
-Noctalia's wallpaper library for this machine is `~/Wallpapers`. Save the
-OpenRGB profile under `profiles/`, link it into
-`~/.config/OpenRGB/profiles/`, then add its wallpaper filename to the `case`
-statement in `scripts/openrgb-wallpaper-profile`. Filename matching allows the
-Noctalia hook's absolute `~/Wallpapers/...` path to work without embedding a
-user-specific path in the mapping. Controller-only profiles are matched to live
-hardware and verified before completion; OpenRGB 1.0 profiles containing plugin
-state are loaded natively and checked for activation.
+After saving a normal or Effects Plugin profile from OpenRGB, run:
+
+```bash
+openrgb-add-wallpaper-profile
+```
+
+The wizard opens the wallpaper picker at `~/Wallpapers` and the profile picker
+at `~/.config/OpenRGB/profiles`. It validates the JSON, copies the profile into
+the repository, replaces OpenRGB's runtime copy with a symlink, updates
+`config/wallpaper-profiles.tsv`, and offers to apply the profile immediately.
+Existing destination files are never replaced without confirmation.
+
+The optional arguments make the same operation scriptable:
+
+```bash
+openrgb-add-wallpaper-profile \
+  --wallpaper ~/Wallpapers/forest.png \
+  --profile ~/.config/OpenRGB/profiles/forest.json \
+  --apply --yes
+```
+
+Mappings use wallpaper and profile basenames. This allows the absolute paths
+emitted by Noctalia to work without embedding a user-specific home directory.
+Controller-only profiles are matched to live hardware and verified before
+completion; OpenRGB 1.0 profiles containing plugin state are loaded natively
+and checked for activation.
 
 ## Requirements
 

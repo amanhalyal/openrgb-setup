@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+set -euo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+script_dir="$(dirname -- "$script_path")"
+repository_dir="$(cd -- "$script_dir/.." && pwd)"
+wallpaper_dir="${NOCTALIA_WALLPAPER_DIR:-$HOME/Wallpapers}"
+openrgb_profile_dir="${OPENRGB_PROFILE_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/OpenRGB/profiles}"
+repository_profile_dir="$repository_dir/profiles"
+mapping_file="${OPENRGB_WALLPAPER_MAP:-$repository_dir/config/wallpaper-profiles.tsv}"
+
+wallpaper_path=""
+profile_path=""
+assume_yes=0
+apply_now="ask"
+
+usage() {
+    cat <<'EOF'
+Usage: openrgb-add-wallpaper-profile [options]
+
+Interactively connect a Noctalia wallpaper to an OpenRGB JSON profile.
+
+Options:
+  --wallpaper PATH  Skip the wallpaper picker
+  --profile PATH    Skip the OpenRGB profile picker
+  --apply           Apply the mapped RGB profile after saving
+  --no-apply        Do not apply the profile after saving
+  --yes              Accept safe copy/link/update prompts
+  -h, --help         Show this help
+EOF
+}
+
+die() {
+    printf 'error: %s\n' "$*" >&2
+    exit 1
+}
+
+confirm() {
+    local reply
+    if (( assume_yes )); then
+        return 0
+    fi
+    read -r -p "$1 [y/N] " reply
+    [[ "$reply" =~ ^[Yy]$ ]]
+}
+
+choose_file() {
+    local title="$1"
+    local directory="$2"
+    local kind="$3"
+    local selected=""
+
+    if [[ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]] && command -v kdialog >/dev/null 2>&1; then
+        if [[ "$kind" == wallpaper ]]; then
+            selected="$(kdialog --title "$title" --getopenfilename "$directory/" \
+                'Images (*.jpg *.jpeg *.png *.webp);;All files (*)')" || return 1
+        else
+            selected="$(kdialog --title "$title" --getopenfilename "$directory/" \
+                'OpenRGB profiles (*.json);;All files (*)')" || return 1
+        fi
+    elif [[ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]] && command -v zenity >/dev/null 2>&1; then
+        if [[ "$kind" == wallpaper ]]; then
+            selected="$(zenity --file-selection --title="$title" --filename="$directory/" \
+                --file-filter='Images | *.jpg *.jpeg *.png *.webp' --file-filter='All files | *')" || return 1
+        else
+            selected="$(zenity --file-selection --title="$title" --filename="$directory/" \
+                --file-filter='OpenRGB profiles | *.json' --file-filter='All files | *')" || return 1
+        fi
+    else
+        read -e -r -p "$title: " selected
+    fi
+
+    [[ -n "$selected" ]] || return 1
+    printf '%s\n' "$selected"
+}
+
+copy_with_confirmation() {
+    local source="$1"
+    local destination="$2"
+    local label="$3"
+
+    if [[ -e "$destination" ]] && [[ "$(readlink -f "$source")" != "$(readlink -f "$destination")" ]]; then
+        if cmp -s -- "$source" "$destination"; then
+            return 0
+        fi
+        confirm "$label already exists at $destination; replace it?" || die "cancelled"
+    fi
+
+    if [[ "$(readlink -f "$source")" != "$(readlink -f "$destination" 2>/dev/null || true)" ]]; then
+        install -m 0644 -- "$source" "$destination"
+    fi
+}
+
+while (( $# )); do
+    case "$1" in
+        --wallpaper)
+            (( $# >= 2 )) || die "--wallpaper requires a path"
+            wallpaper_path="$2"
+            shift 2
+            ;;
+        --profile)
+            (( $# >= 2 )) || die "--profile requires a path"
+            profile_path="$2"
+            shift 2
+            ;;
+        --apply)
+            apply_now="yes"
+            shift
+            ;;
+        --no-apply)
+            apply_now="no"
+            shift
+            ;;
+        --yes)
+            assume_yes=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            die "unknown option: $1"
+            ;;
+    esac
+done
+
+mkdir -p -- "$wallpaper_dir" "$openrgb_profile_dir" "$repository_profile_dir" "$(dirname -- "$mapping_file")"
+
+if [[ -z "$wallpaper_path" ]]; then
+    wallpaper_path="$(choose_file 'Choose the Noctalia wallpaper' "$wallpaper_dir" wallpaper)" || exit 130
+fi
+[[ -f "$wallpaper_path" ]] || die "wallpaper is not a file: $wallpaper_path"
+wallpaper_path="$(readlink -f "$wallpaper_path")"
+
+case "${wallpaper_path,,}" in
+    *.jpg|*.jpeg|*.png|*.webp) ;;
+    *) die "unsupported wallpaper type: $wallpaper_path" ;;
+esac
+
+wallpaper_destination="$wallpaper_dir/${wallpaper_path##*/}"
+if [[ "$wallpaper_path" != "$(readlink -f "$wallpaper_destination" 2>/dev/null || true)" ]]; then
+    confirm "Copy the wallpaper into $wallpaper_dir?" || die "wallpaper must be stored in $wallpaper_dir"
+    copy_with_confirmation "$wallpaper_path" "$wallpaper_destination" "Wallpaper"
+    wallpaper_path="$(readlink -f "$wallpaper_destination")"
+fi
+
+if [[ -z "$profile_path" ]]; then
+    profile_path="$(choose_file 'Choose the corresponding OpenRGB profile' "$openrgb_profile_dir" profile)" || exit 130
+fi
+[[ -f "$profile_path" ]] || die "OpenRGB profile is not a file: $profile_path"
+profile_path="$(readlink -f "$profile_path")"
+[[ "${profile_path,,}" == *.json ]] || die "OpenRGB profile must be JSON: $profile_path"
+
+jq -e '
+    (.profile_name | type == "string" and length > 0) and
+    (.profile_version | type == "number") and
+    (.controllers | type == "array" and length > 0)
+' "$profile_path" >/dev/null || die "invalid OpenRGB 1.0 profile JSON: $profile_path"
+
+profile_name="$(jq -r '.profile_name' "$profile_path")"
+profile_filename="${profile_path##*/}"
+profile_destination="$repository_profile_dir/$profile_filename"
+
+copy_with_confirmation "$profile_path" "$profile_destination" "Profile"
+ln -sfn -- "$profile_destination" "$openrgb_profile_dir/$profile_filename"
+
+# Validate after installing the runtime symlink. Integrated plugin profiles
+# must be registered with the running OpenRGB server before they can be used.
+server_unit="app-openrgb@autostart.service"
+systemctl --user start "$server_unit" >/dev/null 2>&1 || die "could not start the OpenRGB server"
+validated=0
+validation_output=""
+for _ in {1..20}; do
+    if validation_output="$(python3 "$repository_dir/src/openrgb-profile-sdk.py" --check "$profile_destination" 2>&1)"; then
+        validated=1
+        break
+    fi
+    sleep 0.5
+done
+if (( validated == 0 )); then
+    [[ -n "$validation_output" ]] && printf '%s\n' "$validation_output" >&2
+    die "profile validation failed; the mapping was not changed"
+fi
+[[ -n "$validation_output" ]] && printf '%s\n' "$validation_output"
+
+wallpaper_filename="${wallpaper_path##*/}"
+[[ "$wallpaper_filename" != *$'\t'* && "$wallpaper_filename" != *$'\n'* ]] || die "unsupported wallpaper filename"
+[[ "$profile_filename" != *$'\t'* && "$profile_filename" != *$'\n'* ]] || die "unsupported profile filename"
+
+mapping_tmp="$(mktemp "${mapping_file}.tmp.XXXXXX")"
+trap 'rm -f -- "${mapping_tmp:-}"' EXIT
+if [[ -f "$mapping_file" ]]; then
+    awk -F '\t' -v wallpaper="$wallpaper_filename" '$1 != wallpaper { print }' "$mapping_file" >"$mapping_tmp"
+else
+    printf '# Wallpaper filename\tOpenRGB profile filename\n' >"$mapping_tmp"
+fi
+printf '%s\t%s\n' "$wallpaper_filename" "$profile_filename" >>"$mapping_tmp"
+chmod 0644 "$mapping_tmp"
+mv -- "$mapping_tmp" "$mapping_file"
+trap - EXIT
+
+printf '\nMapped wallpaper to RGB profile:\n  %s\n  -> %s (%s)\n' \
+    "$wallpaper_path" "$profile_destination" "$profile_name"
+
+if [[ "$apply_now" == ask ]]; then
+    if confirm "Apply this RGB profile now?"; then
+        apply_now="yes"
+    else
+        apply_now="no"
+    fi
+fi
+
+if [[ "$apply_now" == yes ]]; then
+    OPENRGB_FORCE=1 "$repository_dir/scripts/openrgb-wallpaper-profile" "$wallpaper_path"
+fi
+
+printf '\nDone. Commit and push the repository when you want to preserve this mapping remotely.\n'

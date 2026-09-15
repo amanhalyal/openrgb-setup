@@ -6,24 +6,33 @@ set -u
 wallpaper_path="${1:-}"
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 script_dir="$(dirname -- "$script_path")"
+repository_dir="$(cd -- "$script_dir/.." && pwd)"
 profile_dir="${OPENRGB_PROFILE_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/OpenRGB/profiles}"
+mapping_file="${OPENRGB_WALLPAPER_MAP:-$repository_dir/config/wallpaper-profiles.tsv}"
 if [[ -z "$wallpaper_path" ]]; then
     wallpaper_path="$(timeout 5 /usr/bin/noctalia msg wallpaper-get 2>/dev/null | head -n 1)"
 fi
 
-# Wallpapers live in ~/Wallpapers. Match filenames so the hook also works with
-# the absolute paths emitted by Noctalia and remains independent of $HOME.
-case "${wallpaper_path##*/}" in
-    tori_gate.jpg)
-        profile="$profile_dir/tori-blue.json"
-        ;;
-    wallhaven-3q2783.jpg)
-        profile="$profile_dir/cathedral-inferno.json"
-        ;;
-    *)
-        exit 0
-        ;;
-esac
+# Wallpapers live in ~/Wallpapers. The data file matches basenames so absolute
+# paths emitted by Noctalia do not embed a user-specific directory in mappings.
+wallpaper_filename="${wallpaper_path##*/}"
+profile_filename=""
+if [[ -f "$mapping_file" ]]; then
+    while IFS=$'\t' read -r mapped_wallpaper mapped_profile; do
+        [[ -n "$mapped_wallpaper" && "$mapped_wallpaper" != \#* ]] || continue
+        if [[ "$mapped_wallpaper" == "$wallpaper_filename" ]]; then
+            profile_filename="${mapped_profile%$'\r'}"
+            break
+        fi
+    done <"$mapping_file"
+fi
+
+[[ -n "$profile_filename" ]] || exit 0
+[[ "$profile_filename" != */* && "$profile_filename" != '.' && "$profile_filename" != '..' ]] || {
+    /usr/bin/logger -t openrgb-wallpaper "invalid mapped profile name for $wallpaper_filename"
+    exit 1
+}
+profile="$profile_dir/$profile_filename"
 
 if [[ ! -f "$profile" ]]; then
     /usr/bin/logger -t openrgb-wallpaper "profile not found: $profile"
