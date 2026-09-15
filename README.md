@@ -13,6 +13,7 @@ of truth.
 - Two G.SKILL DDR5 modules exposed as ENE DRAM at `0x71` and `0x73`
 - A Gigabyte B850 Gaming X WIFI6E motherboard and its ARGB headers
 - Wallpaper-driven profile selection through Noctalia
+- Integrated OpenRGB Effects Plugin profiles for animated wallpaper themes
 - Display-idle lighting shutdown and profile restoration
 - Lighting shutdown before system power-off
 
@@ -34,12 +35,10 @@ openrgb-wallpaper-profile
         │ selects a saved JSON profile
         ▼
 openrgb-apply-profile
-        │ uses the persistent SDK server
-        ▼
-serialized mode → settle → color → settle
         │
-        ▼
-physical ENE register verification
+        ├─ controller-only profile → serialized SDK writes → ENE verification
+        │
+        └─ integrated plugin profile → native profile load → animation check
         │
         ▼
 success marker written
@@ -55,7 +54,7 @@ profile; an OpenRGB exit code or cached SDK state alone is insufficient.
 | --- | --- |
 | `scripts/` | Active wallpaper, idle, and profile entry points |
 | `src/` | OpenRGB SDK profile adapter and ENE hardware verification |
-| `profiles/` | Versioned Tori Blue, Purple, and Off hardware profiles |
+| `profiles/` | Versioned static and animated wallpaper profiles |
 | `config/` | Validated detector settings and motherboard zone layout |
 | `systemd/` | System shutdown unit |
 | `docs/` | Setup notes, incident records, and recovery procedures |
@@ -72,7 +71,7 @@ mkdir -p ~/.local/bin ~/.config/OpenRGB/profiles
 for script in openrgb-apply-profile openrgb-wallpaper-profile headless-display-mode.sh idle-off-check.sh; do
   ln -sfn "$PWD/scripts/$script" "$HOME/.local/bin/$script"
 done
-for profile in tori-blue purple off; do
+for profile in tori-blue cathedral-inferno purple off; do
   ln -sfn "$PWD/profiles/$profile.json" "$HOME/.config/OpenRGB/profiles/$profile.json"
 done
 ```
@@ -99,16 +98,24 @@ Force the current wallpaper mapping to run again:
 OPENRGB_FORCE=1 scripts/openrgb-wallpaper-profile
 ```
 
+Overlapping wallpaper events wait for the active RGB write to finish. This
+ensures a quick A -> B -> A wallpaper sequence finishes on the last selection
+instead of dropping it while the ENE controllers are being verified.
+
 The adapter exits unsuccessfully and does not update the wallpaper state marker
-when controller mapping, OpenRGB state, or ENE hardware verification fails.
+when controller mapping, native profile activation, animation, OpenRGB state,
+or ENE hardware verification fails.
 
 ## Adding a wallpaper profile
 
-Save the profile under `profiles/`, link it into
+Noctalia's wallpaper library for this machine is `~/Wallpapers`. Save the
+OpenRGB profile under `profiles/`, link it into
 `~/.config/OpenRGB/profiles/`, then add its wallpaper filename to the `case`
-statement in `scripts/openrgb-wallpaper-profile`. Profiles are matched to live
-controllers by type, name, and stable location information before any write
-occurs.
+statement in `scripts/openrgb-wallpaper-profile`. Filename matching allows the
+Noctalia hook's absolute `~/Wallpapers/...` path to work without embedding a
+user-specific path in the mapping. Controller-only profiles are matched to live
+hardware and verified before completion; OpenRGB 1.0 profiles containing plugin
+state are loaded natively and checked for activation.
 
 ## Requirements
 
@@ -124,6 +131,7 @@ addresses, paths, and zone layouts before adapting it to another computer.
 ### Tested configuration
 
 - OpenRGB `1.0-2.1`, SDK protocol v6
+- OpenRGB Effects Plugin `1.0`, plugin API v5
 - Linux `7.2.4` with `i2c-dev` and `i2c-piix4`
 - ENE `AUDA0-E6K5-0101` DDR5 lighting controllers
 - Gigabyte IT5711 motherboard controller

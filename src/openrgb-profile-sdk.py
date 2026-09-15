@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Apply saved controller state through a persistent OpenRGB SDK server.
 
-Uses SDK v6's device/mode/LED API. No hardware names, colors or mode
-substitutions. Unsupported profile features fail before any writes.
+Uses SDK v6's device/mode/LED and native profile APIs. Controller-only profiles
+are applied and verified directly; integrated plugin profiles are loaded by the
+server so their plugin state is restored. No hardware names, colors, or mode
+substitutions are made.
 """
 import argparse
 import ctypes
@@ -163,6 +165,22 @@ class Client:
             raise ValueError('Invalid controller count')
         ids = [data.number() for _ in range(count)]
         return [dict(self.controller(i), sdk_id=i) for i in ids]
+
+    def profile_names(self):
+        data = Reader(self.request(0, 150))
+        declared_size = data.number()
+        if declared_size != len(data.data):
+            raise ValueError('SDK profile-list size mismatch')
+        names = [data.text() for _ in range(data.number('H'))]
+        if data.pos != len(data.data):
+            raise ValueError('Unexpected SDK profile-list fields')
+        return names
+
+    def active_profile(self):
+        return self.request(0, 156).rstrip(b'\0').decode()
+
+    def load_profile(self, name):
+        self.request(0, 152, name.encode() + b'\0', ack=True)
 
 
 def location(value):
@@ -348,6 +366,39 @@ def apply(client, operations):
     verify_ene_hardware(ene_targets)
 
 
+def apply_native_profile(client, profile):
+    """Load an integrated OpenRGB 1.0 profile, including plugin state."""
+    profile_name = profile.get('profile_name')
+    if not profile_name or profile_name not in client.profile_names():
+        raise ValueError(f'Native OpenRGB profile is not registered: {profile_name!r}')
+
+    client.load_profile(profile_name)
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if client.active_profile() == profile_name:
+            break
+        time.sleep(0.1)
+    else:
+        raise ValueError(f'OpenRGB did not activate profile: {profile_name}')
+
+    autostart_effects = [effect for plugin in profile.get('plugins', {}).values()
+                         for effect in plugin.get('Effects', []) if effect.get('AutoStart')]
+    if autostart_effects:
+        snapshots = []
+        for _ in range(4):
+            snapshots.append([controller['colors'] for controller in client.controllers()])
+            time.sleep(0.35)
+        changed = [any(snapshot[index] != snapshots[0][index]
+                       for snapshot in snapshots[1:])
+                   for index in range(len(snapshots[0]))]
+        if not any(changed):
+            raise ValueError(f'Autostart effect did not animate any controller: {profile_name}')
+        print(f'Verified native OpenRGB profile: {profile_name}; animated controllers: '
+              f'{sum(changed)}/{len(changed)}')
+    else:
+        print(f'Verified native OpenRGB profile: {profile_name}')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('profile', nargs='?')
@@ -365,10 +416,26 @@ def main():
                 return
             with open(args.profile) as source:
                 profile = json.load(source)
+            if profile.get('plugins'):
+                profile_name = profile.get('profile_name')
+                if not profile_name or profile_name not in client.profile_names():
+                    raise ValueError(f'Native OpenRGB profile is not registered: {profile_name!r}')
+                if args.check:
+                    print(f'Validated native OpenRGB profile: {profile_name}; no writes')
+                else:
+                    apply_native_profile(client, profile)
+                return
             operations = plan(profile, live)
             if args.check:
                 print(f'Validated {len(operations)} controller mappings; no writes')
             else:
+                # Loading a non-plugin profile tells integrated plugins to stop
+                # effects from the previous profile. The compatibility adapter
+                # then reapplies and verifies controller state serially.
+                profile_name = profile.get('profile_name')
+                if profile_name in client.profile_names():
+                    client.load_profile(profile_name)
+                    time.sleep(2)
                 apply(client, operations)
         finally:
             client.sock.close()

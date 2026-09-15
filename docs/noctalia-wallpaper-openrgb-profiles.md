@@ -8,10 +8,11 @@ profile adapter installed 2026-09-13.
 Load an OpenRGB profile that matches the active Noctalia wallpaper without
 hardcoding a profile in the generic OpenRGB autostart entry.
 
-The first mapping is:
+Noctalia's wallpaper directory is `~/Wallpapers`. The current mappings are:
 
 ```text
 tori_gate.jpg -> ~/.config/OpenRGB/profiles/tori-blue.json
+wallhaven-3q2783.jpg -> ~/.config/OpenRGB/profiles/cathedral-inferno.json
 ```
 
 Wallpapers without a mapping leave the current RGB state unchanged.
@@ -27,8 +28,9 @@ wallpaper_changed = "/home/YOUR_USER/.local/bin/openrgb-wallpaper-profile \"$NOC
 ```
 
 The `started` hook synchronizes RGB with the restored wallpaper at login. The
-`wallpaper_changed` hook receives the newly applied path from Noctalia and
-runs once for each changed output.
+`wallpaper_changed` hook receives the newly applied absolute path from Noctalia
+and runs once for each changed output. The script matches the basename, so paths
+below `~/Wallpapers` do not need to be duplicated in every mapping.
 
 The mapping and load logic are in:
 
@@ -36,8 +38,10 @@ The mapping and load logic are in:
 ~/.local/bin/openrgb-wallpaper-profile
 ```
 
-The helper uses `flock` because both monitors can report the same wallpaper
-change. It also records the applied profile in:
+The helper uses a bounded, blocking `flock` because both monitors can report the
+same wallpaper change and a user can select another wallpaper while ENE hardware
+verification is still running. New events wait instead of being discarded. It
+also records the applied profile in:
 
 ```text
 $XDG_RUNTIME_DIR/openrgb-wallpaper-profile.current
@@ -87,16 +91,19 @@ The wallpaper helper now:
 
 1. Starts `app-openrgb@autostart.service` if necessary.
 2. Waits until the server exposes the complete saved controller layout.
-3. Calls `~/.local/bin/openrgb-apply-profile`, which compares controller names,
-   locations, zones, and LED counts between the selected profile and OpenRGB's
-   current controller cache.
-4. The adapter writes mode, zone, and color updates sequentially through the
-   persistent SDK server, allowing each asynchronous hardware operation to
-   settle before the next one.
-5. Verifies both ENE DIMMs through their physical SMBus registers and writes
-   the state marker only after verification succeeds. The versioned profiles
-   store uniform motherboard colors in Static mode so the IT5711 retains them
-   across its onboard LEDs and ARGB headers.
+3. Calls `~/.local/bin/openrgb-apply-profile`. Controller-only profiles use the
+   compatibility adapter, which compares controller names, locations, zones,
+   and LED counts between the profile and OpenRGB's current controller cache.
+4. The compatibility adapter writes mode, zone, and color updates sequentially
+   through the persistent SDK server, allowing each asynchronous hardware
+   operation to settle before the next one.
+5. Profiles containing OpenRGB 1.0 plugin state use the server's native profile
+   manager so effects such as Custom Gradient Wave are restored along with the
+   controller selection. The helper verifies the active profile and confirms
+   that an autostart animation changes controller colors over time.
+6. For controller-only profiles, the helper verifies both ENE DIMMs through
+   their physical SMBus registers. The state marker is written only after the
+   selected verification path succeeds.
 
 ## Confirmed OpenRGB 1.0 profile-loading regression
 
@@ -158,6 +165,32 @@ The adapter is also the single restore engine used by
 `headless-display-mode.sh`, preventing the boot/wallpaper and idle paths from
 diverging again.
 
+## Implementation record: 2026-09-15 — animated cathedral profile
+
+The `wallhaven-3q2783.jpg` wallpaper under `~/Wallpapers` is mapped to the
+versioned `cathedral-inferno.json` profile. The profile embeds an autostart
+`CustomGradientWave` from OpenRGB Effects Plugin 1.0 and targets both ENE DIMMs
+plus all selected Gigabyte motherboard zones.
+
+OpenRGB 1.0's profile-manager SDK packets are used for profiles containing a
+`plugins` object. This is required because replaying only controller colors
+would capture one animation frame without restoring the effect. Successful
+application requires the server to report `cathedral-inferno` as active and at
+least one selected controller to change colors across successive SDK samples.
+The tested profile animates all three controllers.
+
+Switching back to a controller-only profile first invokes the native profile
+manager so the Effects plugin receives its profile-change notification and
+stops the previous animation. The compatibility adapter then serializes and
+hardware-verifies the static controller state as before.
+
+Profile writes can take several seconds, especially when both ENE DIMMs require
+physical register verification. The wallpaper hook therefore waits on its lock
+for up to 60 seconds. Previously it used a non-blocking lock, which discarded a
+rapid second selection such as Cathedral -> Torii -> Cathedral. A regression
+test confirmed both queued invocations complete and the last-selected cathedral
+profile remains active with all three controllers animating.
+
 ## Investigation record: 2026-09-14 — partial profile after boot
 
 After login, the case/ARGB lighting changed to Tori Blue but both ENE DRAM
@@ -213,6 +246,9 @@ case "${wallpaper_path##*/}" in
     tori_gate.jpg)
         profile="$profile_dir/tori-blue.json"
         ;;
+    wallhaven-3q2783.jpg)
+        profile="$profile_dir/cathedral-inferno.json"
+        ;;
     another-wallpaper.jpg)
         profile="$profile_dir/another-profile.json"
         ;;
@@ -223,9 +259,10 @@ esac
 ```
 
 Save the OpenRGB profile and keep the generated persistent profile under
-`~/.config/OpenRGB/profiles/` with a `.json` suffix. Do not update temporary
-restore snapshots such as `pre-headless.orp`; those are intentionally separate
-from persistent OpenRGB profiles.
+`~/.config/OpenRGB/profiles/` with a `.json` suffix. OpenRGB 1.0 embeds Effects
+Plugin state in the profile's `plugins` object; do not split that state into a
+second wallpaper mapping. Do not update temporary restore snapshots such as
+`pre-headless.orp`; those are intentionally separate from persistent profiles.
 
 ## Verification
 

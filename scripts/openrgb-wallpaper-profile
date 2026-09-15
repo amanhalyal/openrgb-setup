@@ -11,10 +11,14 @@ if [[ -z "$wallpaper_path" ]]; then
     wallpaper_path="$(timeout 5 /usr/bin/noctalia msg wallpaper-get 2>/dev/null | head -n 1)"
 fi
 
-# Map wallpaper filenames to saved OpenRGB profiles. Add future mappings here.
+# Wallpapers live in ~/Wallpapers. Match filenames so the hook also works with
+# the absolute paths emitted by Noctalia and remains independent of $HOME.
 case "${wallpaper_path##*/}" in
     tori_gate.jpg)
         profile="$profile_dir/tori-blue.json"
+        ;;
+    wallhaven-3q2783.jpg)
+        profile="$profile_dir/cathedral-inferno.json"
         ;;
     *)
         exit 0
@@ -30,7 +34,14 @@ runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 state_file="$runtime_dir/openrgb-wallpaper-profile.current"
 
 exec 9>"$runtime_dir/openrgb-wallpaper-profile.lock"
-/usr/bin/flock -n 9 || exit 0
+# Profile application can take several seconds while ENE hardware is verified.
+# Queue a newer wallpaper event instead of silently dropping it while another
+# event holds the lock. Duplicate monitor events are skipped by the state file
+# after they acquire the lock.
+if ! /usr/bin/flock -w 60 9; then
+    /usr/bin/logger -t openrgb-wallpaper "timed out waiting to apply ${profile##*/} for ${wallpaper_path##*/}"
+    exit 1
+fi
 
 if [[ "${OPENRGB_FORCE:-0}" != 1 ]] && [[ -f "$state_file" ]] && [[ "$(<"$state_file")" == "$profile" ]]; then
     exit 0
