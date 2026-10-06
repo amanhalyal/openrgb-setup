@@ -77,8 +77,7 @@ case "${1:-}" in
         fi
         /usr/bin/noctalia msg dpms-off
         if ! restore_rgb_profile "$PROFILE_DIR/off.json"; then
-            logger -t headless-display-mode "RGB off application failed; restoring displays"
-            /usr/bin/noctalia msg dpms-on
+            logger -t headless-display-mode "RGB off application failed; leaving displays powered off and preserving the restore snapshot"
             exit 1
         fi
         ;;

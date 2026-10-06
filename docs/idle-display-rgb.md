@@ -86,6 +86,39 @@ Expected inactive state:
 - `~/.cache/headless-display-mode/active` exists.
 - `~/.cache/headless-display-mode/pre-headless.orp` exists.
 
+## Investigation record: 2026-10-06 — Off profile after ARGB resize
+
+The live motherboard zones were resized to `6, 8, 0, 1, 1` (16 LEDs), but
+`off.json` still described `64, 64, 64, 1, 1` (194 LEDs). The SDK adapter
+rejected the mismatched profile. The headless handler then turned displays
+back on, so each idle shutdown left both the lighting and monitors on.
+
+The Off profile now matches the live layout, with zero colors throughout,
+native Off mode for both DRAM controllers, and Static black for the motherboard.
+The handler now keeps displays powered off if RGB application fails, preserving
+the recovery snapshot. A stale recovery marker from a failed shutdown was
+cleared after successfully restoring the current wallpaper effect.
+
+Validation confirmed all three controller mappings, Off state for both RAM
+modules and the motherboard, physical ENE register checks, and restoration of
+the animated Peachy profile on all three controllers. Both monitor DPMS states
+were checked off and then on. Noctalia's configuration remains valid with lock
+at 600 seconds and headless shutdown at 660 seconds (60 seconds while locked).
+
+The full automatic idle sequence was verified on 2026-10-06 (IST):
+
+- At 10:07:51, Noctalia locked the session after the idle lock timeout.
+- At 10:08:53, the headless action triggered and both monitors powered off.
+- By 10:09:05, the SDK adapter successfully applied the corrected Off profile.
+- At 10:10:00, a second live check confirmed the session remained locked,
+  both monitors reported `dpmsStatus: false`, both ENE DRAM controllers were
+  in Off mode, and the motherboard was in Static mode with all colors black.
+- The user confirmed that the monitors and RGB lighting were off.
+
+Historical logs also showed idle actions suppressed by Firefox audio/video
+inhibitors. Keeping the desktop awake during playback is the user's chosen
+behavior; automatic lock and shutdown resume when playback inhibition ends.
+
 ## OpenRGB 1.0 profile migration and idle-off failure
 
 On 2026-09-12, OpenRGB was upgraded from `1.0rc3-3.1` to `1.0-2.1`. The new
