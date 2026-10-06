@@ -10,6 +10,7 @@ RGB_SNAPSHOT="$STATE_DIR/pre-headless.orp"
 SNAPSHOT_TMP="$RGB_SNAPSHOT.tmp"
 SNAPSHOT_FILE="${SNAPSHOT_TMP}.orp"
 ACTIVE_MARKER="$STATE_DIR/active"
+RGB_OFF_MARKER="$STATE_DIR/rgb-off-applied"
 PROFILE_DIR="${OPENRGB_PROFILE_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/OpenRGB/profiles}"
 
 session_is_locked() {
@@ -17,6 +18,20 @@ session_is_locked() {
 
     status="$(timeout 5 /usr/bin/noctalia msg status 2>/dev/null)" || return 1
     /usr/bin/jq -e '.locked == true' <<<"$status" >/dev/null
+}
+
+displays_are_off() {
+    local monitors
+
+    monitors="$(timeout 5 /usr/bin/hyprctl -j monitors 2>/dev/null)" || return 1
+    /usr/bin/jq -e 'length > 0 and all(.[]; .dpmsStatus == false)' <<<"$monitors" >/dev/null
+}
+
+displays_are_on() {
+    local monitors
+
+    monitors="$(timeout 5 /usr/bin/hyprctl -j monitors 2>/dev/null)" || return 1
+    /usr/bin/jq -e 'any(.[]; .dpmsStatus == true)' <<<"$monitors" >/dev/null
 }
 
 restore_rgb_profile() (
@@ -42,9 +57,8 @@ restore_rgb_profile() (
     return 1
 )
 
-# Noctalia can report activity while the idle-off command is still saving the
-# restore state and applying the Off profile. Keep that older command from
-# finishing after its resume command and powering the displays back down.
+# Serialize RGB writes when input arrives during an Off application. Native
+# monitor wake runs independently, so it never waits for this lock or SMBus.
 runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 exec 8>"$runtime_dir/headless-display-mode-transition.lock"
 if ! /usr/bin/flock -w 120 8; then
@@ -53,11 +67,22 @@ if ! /usr/bin/flock -w 120 8; then
 fi
 
 case "${1:-}" in
-    off)
+    off|rgb-off)
         # Noctalia can replay the locked_timeout action shortly after unlock.
         # Ignore that stale callback so it cannot overwrite a restored profile.
         if ! session_is_locked; then
             logger -t headless-display-mode "Ignored RGB-off request because the session is unlocked"
+            exit 0
+        fi
+        # The observer may have sampled DPMS before a keypress woke the screen.
+        # RGB-only calls must never turn the screen back off.
+        if [[ "$1" == rgb-off ]] && ! displays_are_off; then
+            exit 0
+        fi
+        if [[ -e "$ACTIVE_MARKER" && -e "$RGB_OFF_MARKER" ]]; then
+            if [[ "$1" == off ]]; then
+                /usr/bin/noctalia msg dpms-off
+            fi
             exit 0
         fi
 
@@ -80,19 +105,35 @@ case "${1:-}" in
             if [[ ! -s "$active_profile" ]] \
                 || ! cp -- "$active_profile" "$RGB_SNAPSHOT"; then
                 rm -f -- "$SNAPSHOT_FILE"
-                logger -t headless-display-mode "Known active RGB profile unavailable; leaving displays and lighting unchanged"
+                logger -t headless-display-mode "Known active RGB profile unavailable; preserving the current lighting state"
                 exit 1
             fi
             touch "$ACTIVE_MARKER"
         fi
-        /usr/bin/noctalia msg dpms-off
+        if [[ "$1" == off ]]; then
+            /usr/bin/noctalia msg dpms-off
+        fi
         if ! restore_rgb_profile "$PROFILE_DIR/off.json"; then
             logger -t headless-display-mode "RGB off application failed; leaving displays powered off and preserving the restore snapshot"
             exit 1
         fi
+        touch "$RGB_OFF_MARKER"
+        # A wake can arrive during the RGB write. Restore immediately rather
+        # than leave the Off profile active until the next observer tick.
+        if [[ "$1" == rgb-off ]] && displays_are_on; then
+            if restore_rgb_profile "$RGB_SNAPSHOT"; then
+                rm -f -- "$ACTIVE_MARKER" "$RGB_OFF_MARKER"
+            else
+                exit 1
+            fi
+        fi
         ;;
-    on)
-        /usr/bin/noctalia msg dpms-on
+    on|rgb-on)
+        if [[ "$1" == on ]]; then
+            /usr/bin/noctalia msg dpms-on
+        elif ! displays_are_on; then
+            exit 0
+        fi
 
         # Recover a snapshot left by an interrupted/older off transition.
         # OpenRGB wrote this exact .orp file before the previous script could
@@ -108,7 +149,7 @@ case "${1:-}" in
 
         if [[ -e "$ACTIVE_MARKER" && -s "$RGB_SNAPSHOT" ]]; then
             if restore_rgb_profile "$RGB_SNAPSHOT"; then
-                rm -f -- "$ACTIVE_MARKER"
+                rm -f -- "$ACTIVE_MARKER" "$RGB_OFF_MARKER"
             else
                 logger -t headless-display-mode "RGB restore failed; keeping recovery marker for retry"
                 exit 1
@@ -119,7 +160,7 @@ case "${1:-}" in
         fi
         ;;
     *)
-        printf 'Usage: %s {off|on}\n' "$0" >&2
+        printf 'Usage: %s {off|on|rgb-off|rgb-on}\n' "$0" >&2
         exit 2
         ;;
 esac

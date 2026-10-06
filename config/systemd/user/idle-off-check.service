@@ -1,0 +1,8 @@
+[Unit]
+Description=Synchronize RGB with Hyprland display power
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/idle-off-check.sh
+TimeoutStartSec=180

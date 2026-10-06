@@ -1,9 +1,9 @@
 # RGB Idle Lighting
 
-> **Legacy implementation:** this timer-based design is disabled and retained
-> only for historical reference. The active Noctalia implementation and the
-> Gigabyte IT5711 restore workaround are documented in
-> `~/Documents/wiki/idle-display-rgb.md`. Do not enable both mechanisms.
+> **Historical implementation below:** the KDE DPMS poller has been replaced.
+> The active setup uses Noctalia's native monitor off/on action and a redesigned
+> Hyprland RGB observer timer. See [current setup](idle-display-rgb.md) for the
+> active commands and unit files; the descriptions below are retained as history.
 
 ## Purpose
 

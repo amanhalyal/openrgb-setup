@@ -1,30 +1,23 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-2.0-or-later
-
-set -u
+set -euo pipefail
 
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 script_dir="$(dirname -- "$script_path")"
+state_dir="${XDG_CACHE_HOME:-$HOME/.cache}/headless-display-mode"
 
-# User services do not always inherit the graphical-session environment, and
-# the Wayland socket number can change between logins (wayland-0, wayland-1,
-# ...). Discover it each time instead of pinning it to one login session.
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
-
-if [ -z "${WAYLAND_DISPLAY:-}" ] || [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
-    WAYLAND_SOCKET=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -type s \
-        -name 'wayland-[0-9]*' -printf '%f\n' 2>/dev/null | sort -V | tail -n 1)
-    [ -n "$WAYLAND_SOCKET" ] || exit 0
-    export WAYLAND_DISPLAY="$WAYLAND_SOCKET"
-fi
-
-if ! DPMS_STATE=$(kscreen-doctor --dpms show 2>/dev/null); then
+# Noctalia's native screen_off action owns display power and wakes immediately
+# on input. This observer follows actual Hyprland DPMS state; it never blanks
+# displays or depends on the custom-command resume callback.
+if ! monitors="$(timeout 5 /usr/bin/hyprctl -j monitors 2>/dev/null)"; then
     exit 0
 fi
-
-if grep -q "off" <<<"$DPMS_STATE"; then
-    exec "$script_dir/headless-display-mode.sh" off
-else
-    exec "$script_dir/headless-display-mode.sh" on
+if /usr/bin/jq -e 'length > 0 and all(.[]; .dpmsStatus == false)' <<<"$monitors" >/dev/null; then
+    if [[ ! -e "$state_dir/active" || ! -e "$state_dir/rgb-off-applied" ]]; then
+        exec "$script_dir/headless-display-mode.sh" rgb-off
+    fi
+elif /usr/bin/jq -e 'any(.[]; .dpmsStatus == true)' <<<"$monitors" >/dev/null; then
+    if [[ -e "$state_dir/active" ]]; then
+        exec "$script_dir/headless-display-mode.sh" rgb-on
+    fi
 fi

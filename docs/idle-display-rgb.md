@@ -2,67 +2,75 @@
 
 ## Purpose
 
-Troubleshoot the inactive/locked desktop state where the monitors should power
-off and PC lighting should be turned off.
+Control automatic locking, monitor power, and RGB lighting on Nexus. Keyboard
+or mouse activity must wake the monitors while the password screen stays locked.
 
 ## Intended behavior
 
-Noctalia controls the idle sequence:
+1. Noctalia locks after 600 seconds without input.
+2. Its native `screen_off` action powers down both monitors after 660 seconds,
+   or after 60 seconds of inactivity while already locked.
+3. The RGB observer detects actual Hyprland DPMS-off state, saves the active
+   wallpaper profile, and applies the corrected Off profile.
+4. On input, Noctalia restores display power natively before any RGB work. The
+   observer restores the saved profile while the user can see the password screen.
+5. Firefox audio/video inhibitors keep the desktop awake, as requested.
 
-1. After 600 seconds (10 minutes), lock the session.
-2. After 660 seconds (11 minutes), run the headless transition.
-3. The transition saves the active OpenRGB profile, powers down both displays
-   through DPMS, and applies the versioned Off profile through the serialized
-   SDK adapter.
-4. On input/unlock, displays and the saved RGB profile are restored through the
-   same adapter.
-
-The off branch first asks Noctalia whether the session is still locked. This
-rejects a delayed idle callback after login before it can turn the restored
-lighting off again.
-
-The active configuration is in:
-
-- `~/.config/noctalia/config.toml`
-- `~/.local/bin/headless-display-mode.sh`
-
-The older mechanism is retained only for reference:
-
-- `~/.config/systemd/user/idle-off-check.timer`
-- `~/.config/systemd/user/idle-off-check.service`
-- `~/.local/bin/idle-off-check.sh`
-
-The old timer is disabled. Do not enable both mechanisms, or they may compete
-for display and RGB state.
+The display wake path does not wait for the RGB adapter or a shell command.
+The observer checks every two seconds; RGB changes also take the adapter's
+application and verification time. Its RGB-only handlers never change DPMS.
 
 ## Active implementation
 
-Noctalia invokes these commands from `~/.config/noctalia/config.toml`:
+Merge the sections from `config/noctalia-idle.toml` into
+`~/.config/noctalia/config.toml`. The active headless behavior is:
 
 ```toml
 [idle.behavior.headless]
-action = "command"
+action = "screen_off"
 enabled = true
 timeout = 660
 locked_timeout = 60
-command = "/home/YOUR_USER/.local/bin/headless-display-mode.sh off"
-resume_command = "/home/YOUR_USER/.local/bin/headless-display-mode.sh on"
+resume_command = "/home/YOUR_USER/.local/bin/idle-off-check.sh"
 ```
 
-The script uses:
+Remove the previous `command = "...headless-display-mode.sh off"` setting.
+Display power belongs to Noctalia's native action. The resume command requests
+an immediate RGB check; the timer also restores RGB if that callback is lost.
 
-- `~/.cache/headless-display-mode/pre-headless.orp` for the last known active
-  lighting state.
-- `~/.cache/headless-display-mode/active` to record that this script switched
-  the lights off and therefore owns the next restore.
-- `~/.local/bin/openrgb-apply-profile` to translate the saved JSON profile into
-  ordinary device operations because OpenRGB 1.0's profile loader is broken on
-  this hardware.
-- `~/.config/OpenRGB/profiles/off.json`, with native `off` mode for both DRAM
-  controllers and Static black for the Gigabyte B850 motherboard/ARGB chain.
-- `$XDG_RUNTIME_DIR/openrgb-wallpaper-profile.lock` to serialize access with
-  the wallpaper-profile helper.
-- `app-openrgb@autostart.service` for the OpenRGB tray and SDK server.
+`idle-off-check.sh` reads `hyprctl -j monitors` and calls only the `rgb-off` or
+`rgb-on` handlers. It has been redesigned from the old KDE DPMS poller; it no
+longer uses `kscreen-doctor`, and it never powers displays on or off.
+
+Install and enable the versioned observer units:
+
+```bash
+mkdir -p ~/.config/systemd/user
+ln -sfn "$PWD/config/systemd/user/idle-off-check.service" ~/.config/systemd/user/idle-off-check.service
+ln -sfn "$PWD/config/systemd/user/idle-off-check.timer" ~/.config/systemd/user/idle-off-check.timer
+systemctl --user daemon-reload
+systemctl --user enable --now idle-off-check.timer
+noctalia msg config-reload
+```
+
+Both units follow `graphical-session.target`. UWSM provides the current
+`HYPRLAND_INSTANCE_SIGNATURE` to the user service environment on Nexus.
+
+The RGB handlers use:
+
+- `~/.cache/headless-display-mode/pre-headless.orp` for the last active profile.
+- `active` to retain ownership of restoration, including after a failed write.
+- `rgb-off-applied` to skip repeated successful Off writes and permit retries
+  after failures.
+- `$XDG_RUNTIME_DIR/headless-display-mode-transition.lock` to serialize RGB
+  transitions and `openrgb-wallpaper-profile.lock` to serialize wallpaper writes.
+- `openrgb-apply-profile` and the persistent OpenRGB SDK server for verified
+  application. `off.json` matches the motherboard's `6, 8, 0, 1, 1` zone layout.
+
+The RGB-off handler checks DPMS before writing and checks for a wake afterward.
+If activity occurs during the write, it restores the saved profile immediately.
+The manual `headless-display-mode.sh on` command remains a recovery command
+that powers displays on and restores RGB.
 
 ## Checks
 
@@ -132,6 +140,28 @@ or restore operation. If a wake arrives during shutdown, the restore command
 runs after the in-progress shutdown and leaves the displays on. Manually
 running the restore command at 22:15:34 brought both monitors back and restored
 the saved RGB profile; Noctalia recorded the session unlock at 22:15:41.
+
+## Investigation record: 2026-10-06 — native monitor wake and RGB observer
+
+The user clarified that keyboard input reached the password field while both
+monitors and lighting remained off. The earlier transition mutex alone was
+insufficient: it serialized scripts but left display wake dependent on a
+custom idle behavior that had already consumed its resume event.
+
+The active behavior now uses Noctalia's native `screen_off` action, whose native
+resume action restores monitor power before launching a resume command. RGB
+follows the real monitor power state through a redesigned Hyprland observer.
+The observer and RGB-only handlers cannot blank the monitors, so a delayed
+lighting operation cannot overwrite a successful display wake.
+
+Isolated checks passed for Off/restore on DPMS transitions, repeated polls
+without duplicate RGB writes, wake during an in-progress Off write, rejection
+of stale Off calls after wake, and retention of recovery state after a failed
+RGB write. Shell syntax, Noctalia config validation, and systemd unit validation
+also passed. The attempted live cycle was interrupted by active use and media
+inhibition and was stopped at the user's request; the normal 600/660-second
+settings and 60-second locked timeout were restored. A full physical keyboard
+wake cycle remains to be observed during normal inactivity.
 
 ## OpenRGB 1.0 profile migration and idle-off failure
 

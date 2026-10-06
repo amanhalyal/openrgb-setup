@@ -1,0 +1,18 @@
+# Merge these sections into ~/.config/noctalia/config.toml.
+# Native display power restores the lock screen on input before RGB work starts.
+[idle]
+behavior_order = [ "lock", "headless" ]
+pre_action_fade_seconds = 2.0
+
+[idle.behavior.lock]
+action = "lock"
+enabled = true
+timeout = 600
+locked_timeout = 0
+
+[idle.behavior.headless]
+action = "screen_off"
+enabled = true
+timeout = 660
+locked_timeout = 60
+resume_command = "/home/aman/.local/bin/idle-off-check.sh"

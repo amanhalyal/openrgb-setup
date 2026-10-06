@@ -1,0 +1,11 @@
+[Unit]
+Description=Observe display power for RGB off and restore
+PartOf=graphical-session.target
+
+[Timer]
+OnActiveSec=2s
+OnUnitInactiveSec=2s
+AccuracySec=1s
+
+[Install]
+WantedBy=graphical-session.target
