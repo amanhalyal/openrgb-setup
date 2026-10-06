@@ -42,6 +42,16 @@ restore_rgb_profile() (
     return 1
 )
 
+# Noctalia can report activity while the idle-off command is still saving the
+# restore state and applying the Off profile. Keep that older command from
+# finishing after its resume command and powering the displays back down.
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+exec 8>"$runtime_dir/headless-display-mode-transition.lock"
+if ! /usr/bin/flock -w 120 8; then
+    logger -t headless-display-mode "Timed out waiting for the display/RGB transition lock"
+    exit 1
+fi
+
 case "${1:-}" in
     off)
         # Noctalia can replay the locked_timeout action shortly after unlock.

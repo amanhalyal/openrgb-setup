@@ -119,6 +119,20 @@ Historical logs also showed idle actions suppressed by Firefox audio/video
 inhibitors. Keeping the desktop awake during playback is the user's chosen
 behavior; automatic lock and shutdown resume when playback inhibition ends.
 
+## Investigation record: 2026-10-06 — wake raced with idle shutdown
+
+The user could not wake the displays after the automatic shutdown. At 22:13:05,
+Noctalia logged the headless action as triggered and then resumed almost
+immediately, but the asynchronous off script still finished applying `off.json`
+at 22:13:17. Its older command could therefore power the monitors back down
+after activity had already resumed.
+
+The headless script now holds a per-session transition lock for the entire off
+or restore operation. If a wake arrives during shutdown, the restore command
+runs after the in-progress shutdown and leaves the displays on. Manually
+running the restore command at 22:15:34 brought both monitors back and restored
+the saved RGB profile; Noctalia recorded the session unlock at 22:15:41.
+
 ## OpenRGB 1.0 profile migration and idle-off failure
 
 On 2026-09-12, OpenRGB was upgraded from `1.0rc3-3.1` to `1.0-2.1`. The new
