@@ -5,8 +5,8 @@ set -euo pipefail
 
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 repository_dir="$(cd -- "$(dirname -- "$script_path")/.." && pwd)"
-profile="$repository_dir/profiles/off.json"
 runtime_dir=/run/openrgb-shutdown
+profile="$runtime_dir/off.json"
 server_port=6743
 server_pid=""
 
@@ -22,12 +22,25 @@ mkdir -p "$runtime_dir"
 exec 9>"$runtime_dir/hardware.lock"
 /usr/bin/flock -w 10 9
 
-# Seed an isolated, disposable config with the validated controller layout.
-# OpenRGB otherwise detects the IT5711 ARGB zones at size zero under root.
+# Use the Off profile as the single source for both controller geometry and
+# the state to apply. The repository's older Configuration.json can have
+# different zone sizes after a desktop resize. OpenRGB detects the IT5711
+# ARGB zones at size zero under root without an explicit configuration.
 rm -rf -- "$runtime_dir/config"
 mkdir -p "$runtime_dir/config"
-cp -- "$repository_dir/config/OpenRGB.json" \
-    "$repository_dir/config/Configuration.json" "$runtime_dir/config/"
+cp -- "$repository_dir/config/OpenRGB.json" "$runtime_dir/config/"
+cp -- "$repository_dir/profiles/off.json" "$profile"
+/usr/bin/python3 - "$profile" "$runtime_dir/config/Configuration.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+configuration = json.loads(Path(sys.argv[1]).read_text())
+if not configuration.get('controllers'):
+    raise ValueError('Off profile contains no controllers')
+configuration['profile_name'] = 'Controller Configuration'
+Path(sys.argv[2]).write_text(json.dumps(configuration, indent=4) + '\n')
+PY
 
 # Shutdown may begin while the desktop SDK server still owns the devices.
 # Close every OpenRGB instance before starting one isolated server.
@@ -59,6 +72,9 @@ for _ in {1..40}; do
 done
 if (( ready == 0 )); then
     printf 'Shutdown OpenRGB server did not detect the saved controller layout\n' >&2
+    /usr/bin/python3 "$repository_dir/src/openrgb-profile-sdk.py" \
+        --check "$profile" >&2 || true
+    cat "$runtime_dir/server.log" >&2
     exit 1
 fi
 

@@ -3,6 +3,12 @@ Description=Turn off RGB lighting on shutdown
 DefaultDependencies=no
 Conflicts=shutdown.target
 Before=shutdown.target reboot.target halt.target
+# Stop the desktop and its RGB observers before this final hardware write.
+Before=user@1000.service
+# The helper and profiles live on a separate /home filesystem. Keep it mounted
+# and the journal running until ExecStop and hardware verification finish.
+RequiresMountsFor=/home/aman/openrgb
+After=systemd-journald.service
 
 [Service]
 Type=oneshot
