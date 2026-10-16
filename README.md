@@ -36,17 +36,24 @@ openrgb-wallpaper-profile
         ▼
 openrgb-apply-profile
         │
-        ├─ controller-only profile → serialized SDK writes → ENE verification
+        ├─ controller-only profile → verified native load → serialized recovery if needed
         │
         └─ integrated plugin profile → native profile load → animation check
         │
         ▼
-success marker written
+success marker written after verification
 ```
 
 Mode, zone, color, and controller operations are serialized. For the ENE DIMMs,
 success requires the physical mode and all LED color registers to match the
 profile; an OpenRGB exit code or cached SDK state alone is insufficient.
+
+Wallpaper changes and idle Off/restore transitions crossfade directly between
+profile colors over about 0.8 seconds. Animated profiles blend toward their
+saved frame, then start their animation. Already-correct Direct modes are kept
+in place so normal switches can start fading after roughly 0.13–0.25 seconds
+of adapter preparation. All profiles use the canonical motherboard layout of
+16 LEDs (`6, 8, 0, 1, 1`); each RAM module has 8 separate LEDs.
 
 ## Repository layout
 
@@ -68,7 +75,7 @@ Create those compatibility links after cloning:
 
 ```bash
 mkdir -p ~/.local/bin ~/.config/OpenRGB/profiles
-for script in openrgb-add-wallpaper-profile openrgb-apply-profile openrgb-wallpaper-profile headless-display-mode.sh idle-off-check.sh; do
+for script in openrgb-add-wallpaper-profile openrgb-apply-profile openrgb-wallpaper-profile openrgb-wallpaper-gradient-preview headless-display-mode.sh idle-off-check.sh; do
   ln -sfn "$PWD/scripts/$script" "$HOME/.local/bin/$script"
 done
 for profile in "$PWD"/profiles/*.json; do
@@ -106,6 +113,18 @@ The adapter exits unsuccessfully and does not update the wallpaper state marker
 when controller mapping, native profile activation, animation, OpenRGB state,
 or ENE hardware verification fails.
 
+Preview the current wallpaper as a three-color Custom Gradient Wave:
+
+```bash
+openrgb-wallpaper-gradient-preview ~/Wallpapers/example.png
+```
+
+The command extracts three distinct dominant colors, closes the gradient by
+repeating the first color, generates the disposable
+`wallpaper-gradient-preview.json` profile, and applies it through the existing
+serialized profile adapter. Use `--no-apply` to inspect the palette and profile
+without changing the lights.
+
 ## Adding a wallpaper profile
 
 After saving a normal or Effects Plugin profile from OpenRGB, run:
@@ -140,6 +159,7 @@ and checked for activation.
 - Linux with access to the relevant `/dev/i2c-*` and HID devices
 - OpenRGB 1.0 with SDK server protocol v6 enabled
 - Python 3
+- Python Pillow
 - `libi2c`, `jq`, `flock`, and systemd user services
 - Noctalia for the wallpaper and idle hooks used by this setup
 
@@ -167,6 +187,7 @@ be reported as verified.
 ## Documentation
 
 - [Wallpaper-aware profiles](docs/noctalia-wallpaper-openrgb-profiles.md)
+- [ARGB header and lighting-zone layout](docs/argb-zone-layout.md)
 - [ENE DRAM application race](docs/ene-dram-apply-race-20260914.md)
 - [Idle display and RGB behavior](docs/idle-display-rgb.md)
 - [Shutdown lighting](docs/shutdown-rgb-aio.md)

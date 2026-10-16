@@ -8,6 +8,8 @@ server so their plugin state is restored. No hardware names, colors, or mode
 substitutions are made.
 """
 import argparse
+import copy
+from contextlib import contextmanager
 import ctypes
 import fcntl
 import json
@@ -19,6 +21,7 @@ import socket
 import struct
 import sys
 import time
+import uuid
 
 FIELDS = ('flags speed_min speed_max brightness_min brightness_max '
           'colors_min colors_max speed brightness direction color_mode').split()
@@ -325,6 +328,146 @@ def verify_ene_hardware(targets):
         os.kill(server_pid, signal.SIGCONT)
 
 
+def state_matches(actual, mode, colors, zone_modes):
+    actual_mode = actual['modes'][actual['active_mode']]
+    keys = ('name', 'speed', 'brightness', 'direction', 'color_mode', 'colors')
+    for zone_index, zi, zm in zone_modes:
+        zone = actual['zones'][zone_index]
+        if zone['active_mode'] != zi:
+            return False
+        if zm and not all(zone['modes'][zi][key] == zm[key] for key in keys):
+            return False
+    return all(actual_mode[key] == mode[key] for key in keys) and actual['colors'] == colors
+
+
+def verify_loaded_state(client, operations):
+    """Accept a native load only when SDK state and physical RAM agree."""
+    targets = []
+    for index, saved, _, mode, colors, zone_modes in operations:
+        actual = client.controller(index)
+        if not state_matches(actual, mode, colors, zone_modes):
+            raise ValueError(f"Native state mismatch: {saved['name']}")
+        target = ene_target(actual, mode, colors)
+        if target:
+            targets.append(target)
+    verify_ene_hardware(targets)
+
+
+def blend_colors(source, target, progress):
+    """Interpolate each RGB channel; packed integers must not be blended."""
+    amount = progress * progress * (3 - 2 * progress)
+    return [sum(round(((a >> shift) & 255) * (1 - amount)
+                      + ((b >> shift) & 255) * amount) << shift
+                for shift in (0, 8, 16)) for a, b in zip(source, target)]
+
+
+def transition_profile(profile, live):
+    """Build a disposable Direct-mode bridge, preserving the outgoing colors."""
+    bridge = copy.deepcopy(profile)
+    bridge['profile_name'] = 'wallpaper-transition-' + uuid.uuid4().hex
+    bridge.pop('plugins', None)
+    bridge.pop('base_color', None)
+    bridge['base_color_enabled'] = False
+    # Validate the destination layout even for native/plugin profiles.
+    destination = copy.deepcopy(bridge)
+    operations = plan(destination, live)
+    by_id = {device['sdk_id']: device for device in live}
+    targets = {}
+    for saved, operation in zip(bridge['controllers'], operations):
+        index = operation[0]
+        targets[index] = list(saved['colors'])
+        saved['colors'] = list(by_id[index]['colors'])
+        direct = next((i for i, mode in enumerate(saved['modes'])
+                       if mode['name'] == 'Direct'), None)
+        if direct is None:
+            raise ValueError(f"Crossfade needs Direct mode: {saved['name']}")
+        saved['active_mode'] = direct
+        for zone in saved['zones']:
+            zone['active_mode'] = -1
+    return bridge, plan(bridge, live), targets
+
+
+def write_transition_colors(client, index, saved, colors):
+    # UPDATEZONELEDS takes the device mutex and performs its hardware write
+    # before ACK. UPDATELEDS merely queues a background write, so its ACK
+    # cannot safely pace a fade or precede physical register verification.
+    offset = 0
+    for zone_index, zone in enumerate(saved['zones']):
+        count = zone['leds_count']
+        if count:
+            data = pack('IH', zone_index, count) + pack('I' * count, *colors[offset:offset + count])
+            client.request(index, 1051, pack('I', len(data) + 4) + data, ack=True)
+        offset += count
+
+
+def crossfade(client, operations, targets, seconds):
+    start = time.monotonic()
+    frames = 0
+    while True:
+        progress = min(1.0, (time.monotonic() - start) / seconds)
+        for index, saved, _, _, colors, _ in operations:
+            blended = blend_colors(colors, targets[index], progress)
+            write_transition_colors(client, index, saved, blended)
+        frames += 1
+        if progress == 1.0:
+            break
+        time.sleep(max(0, start + frames / 30 - time.monotonic()))
+    print(f'Crossfaded {len(operations)} controllers in '
+          f'{time.monotonic() - start:.2f}s ({frames} frames)')
+
+
+@contextmanager
+def profile_transition(client, profile, live, seconds):
+    temporary_name = None
+    try:
+        if seconds:
+            try:
+                bridge, operations, targets = transition_profile(profile, live)
+                preparation_start = time.monotonic()
+                by_id = {device['sdk_id']: device for device in live}
+                changed = [op for op in operations
+                           if not state_matches(by_id[op[0]], op[3], by_id[op[0]]['colors'], op[5])]
+                # Loading even an empty controller list stops the outgoing
+                # plugin. Leave controllers already in Direct alone, avoiding
+                # redundant mode writes and their settling delay.
+                bridge['controllers'] = [op[1] for op in changed]
+                # Profile upload/delete require a loopback local-client grant.
+                client.request(0, 52, pack('I', 1 << 16), ack=True)
+                client.request(0, 154, json.dumps(bridge).encode() + b'\0', ack=True)
+                temporary_name = bridge['profile_name']
+                client.load_profile(temporary_name)
+                if any(ene_target(by_id[op[0]], op[3], op[4]) for op in changed):
+                    time.sleep(HARDWARE_SETTLE_SECONDS)
+                # An outgoing effect can render one last frame while its stop
+                # notification is handled. Start from that final live frame,
+                # rather than replaying the earlier snapshot over it.
+                stopped = {device['sdk_id']: device for device in client.controllers()}
+                for index, saved, _, _, colors, _ in operations:
+                    colors[:] = stopped[index]['colors']
+                    # Native loading can leave an ENE hardware frame behind
+                    # its SDK cache when an effect stops. Synchronize colors
+                    # with synchronous writes, without replaying settled modes.
+                    write_transition_colors(client, index, saved, colors)
+                try:
+                    verify_loaded_state(client, operations)
+                except ValueError as error:
+                    print(f'{error}; preparing Direct mode with serialized writes')
+                    apply(client, operations)
+                print(f'Prepared crossfade in {time.monotonic() - preparation_start:.2f}s')
+                crossfade(client, operations, targets, seconds)
+            except (OSError, ValueError, KeyError, IndexError, TypeError, struct.error) as error:
+                # Always proceed to the real target, including after a partial
+                # fade, so failure cannot strand the lights at an interim color.
+                print(f'Transition unavailable: {error}; applying target directly')
+        yield
+    finally:
+        if temporary_name:
+            try:
+                client.request(0, 153, temporary_name.encode() + b'\0', ack=True)
+            except (OSError, ValueError) as error:
+                print(f'Temporary transition profile cleanup failed: {error}', file=sys.stderr)
+
+
 def apply(client, operations):
     ene_targets = []
     for index, saved, mode_index, mode, colors, zone_modes in operations:
@@ -343,15 +486,7 @@ def apply(client, operations):
         deadline = time.monotonic() + 3
         while True:
             actual = client.controller(index)
-            actual_mode = actual['modes'][actual['active_mode']]
-            keys = ('name', 'speed', 'brightness', 'direction', 'color_mode', 'colors')
-            zones_match = True
-            for zone_index, zi, zm in zone_modes:
-                az = actual['zones'][zone_index]
-                zones_match &= az['active_mode'] == zi
-                if zm and az['active_mode'] >= 0:
-                    zones_match &= all(az['modes'][az['active_mode']][k] == zm[k] for k in keys)
-            if (all(actual_mode[k] == mode[k] for k in keys) and actual['colors'] == colors and zones_match):
+            if state_matches(actual, mode, colors, zone_modes):
                 break
             if time.monotonic() >= deadline:
                 raise ValueError(f"State readback mismatch: {saved['name']} {saved['location']}")
@@ -404,7 +539,12 @@ def main():
     parser.add_argument('profile', nargs='?')
     parser.add_argument('--inspect', action='store_true')
     parser.add_argument('--check', action='store_true')
+    parser.add_argument('--fade-seconds', type=float,
+                        default=os.environ.get('OPENRGB_FADE_SECONDS', '0'),
+                        help='crossfade duration, 0 disables (default: OPENRGB_FADE_SECONDS or 0)')
     args = parser.parse_args()
+    if not 0 <= args.fade_seconds <= 5:
+        parser.error('--fade-seconds must be between 0 and 5')
     runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
     with (runtime / 'openrgb-sdk-apply.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -423,22 +563,37 @@ def main():
                 if args.check:
                     print(f'Validated native OpenRGB profile: {profile_name}; no writes')
                 else:
-                    apply_native_profile(client, profile)
+                    with profile_transition(client, profile, live, args.fade_seconds):
+                        apply_native_profile(client, profile)
                 return
             operations = plan(profile, live)
             if args.check:
                 print(f'Validated {len(operations)} controller mappings; no writes')
             else:
-                # Loading a non-plugin profile tells integrated plugins to stop
-                # effects from the previous profile. The compatibility adapter
-                # then reapplies and verifies controller state serially.
-                profile_name = profile.get('profile_name')
-                if profile_name in client.profile_names():
-                    client.load_profile(profile_name)
-                    time.sleep(2)
-                apply(client, operations)
+                with profile_transition(client, profile, live, args.fade_seconds):
+                    apply_controller_profile(client, profile, operations)
         finally:
             client.sock.close()
+
+
+def apply_controller_profile(client, profile, operations):
+    # Loading a non-plugin profile tells integrated plugins to stop
+    # effects from the previous profile. Verify the native load
+    # first; replay serially only if it did not reach the hardware.
+    profile_name = profile.get('profile_name')
+    if profile_name in client.profile_names():
+        client.load_profile(profile_name)
+        time.sleep(HARDWARE_SETTLE_SECONDS)
+        try:
+            verify_loaded_state(client, operations)
+        except ValueError as error:
+            print(f'{error}; using serialized hardware writes')
+            # Preserve the original settling budget before recovery.
+            time.sleep(2 - HARDWARE_SETTLE_SECONDS)
+        else:
+            print(f'Verified native controller profile: {profile_name}')
+            return
+    apply(client, operations)
 
 
 if __name__ == '__main__':

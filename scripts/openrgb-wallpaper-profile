@@ -75,7 +75,8 @@ if [[ "$server_age" =~ ^[0-9]+$ ]] && (( server_age < 5 )); then
     /usr/bin/sleep "$((5 - server_age))"
 fi
 
-output="$(timeout 40 "$script_dir/openrgb-apply-profile" "$profile" 2>&1)"
+output="$(OPENRGB_FADE_SECONDS="${OPENRGB_WALLPAPER_FADE_SECONDS:-0.8}" \
+    timeout 40 "$script_dir/openrgb-apply-profile" "$profile" 2>&1)"
 status=$?
 [[ -n "$output" ]] && printf '%s\n' "$output"
 

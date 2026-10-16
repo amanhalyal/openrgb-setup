@@ -47,7 +47,8 @@ restore_rgb_profile() (
         return 1
     fi
 
-    output="$(timeout 40 "$script_dir/openrgb-apply-profile" "$profile" 2>&1)"
+    output="$(OPENRGB_FADE_SECONDS="${OPENRGB_IDLE_FADE_SECONDS:-0.8}" \
+        timeout 40 "$script_dir/openrgb-apply-profile" "$profile" 2>&1)"
     if [[ $? -eq 0 ]]; then
         logger -t headless-display-mode "Restored ${profile##*/} through hardware-verified SDK adapter"
         return 0

@@ -150,6 +150,61 @@ failure is specifically in OpenRGB 1.0 profile application.
 
 ## Generic profile adapter
 
+### Profile crossfades
+
+Wallpaper changes and idle Off/restore transitions now blend directly between
+the outgoing and incoming colors over **0.8 seconds**, with a smooth easing
+curve and up to 30 frames per second. There is no intermediate black frame;
+black is the destination only when the selected profile is Off.
+
+The adapter snapshots the outgoing controller colors and loads a disposable
+Direct-mode profile to stop Effects Plugin rendering before blending. It changes
+only controllers whose Direct-mode settings differ, waits for ENE mode changes
+when needed, synchronizes controller colors, and verifies the
+physical ENE registers before sending sequential, synchronous color updates.
+Animated destinations blend toward their saved color frame, then their real
+profile is loaded and its animation starts. The outgoing animation pauses
+during the blend. Preparation and final verification add time beyond the
+0.8-second visible blend.
+
+For normal wallpaper switches, already-configured Direct controllers are omitted
+from the temporary profile. This removes the unconditional 0.75-second pause;
+measured preparation now takes 0.13–0.25 seconds. Waking from hardware Off still
+waits for the RAM's Direct-mode change before fading in. The temporary profile
+also omits `base_color`, so native loading cannot replace the outgoing colors
+with a uniform color before the blend starts.
+
+Source profiles, effect settings, and the canonical 16-LED motherboard layout
+are preserved. Temporary transition profiles are removed after application.
+If transition preparation or rendering fails, the adapter still attempts the
+real target profile through the normal verified application path.
+
+`OPENRGB_WALLPAPER_FADE_SECONDS` and `OPENRGB_IDLE_FADE_SECONDS` control the
+duration for their respective hooks; set either to `0` to disable its fade.
+Manual applications and system shutdown retain their existing behavior unless
+explicitly opted in, for example:
+
+```bash
+OPENRGB_FADE_SECONDS=1.2 scripts/openrgb-apply-profile profiles/white.json
+```
+
+Durations from 0 to 5 seconds are supported. `--check` never starts a transition.
+Live tests produced 18–19 hardware-paced frames over approximately 0.9 seconds
+with the default duration, and all three controllers passed final verification.
+The implementation uses the native profile and synchronous color-update APIs
+described in the [OpenRGB SDK source](https://github.com/CalcProgrammer1/OpenRGB/blob/master/NetworkServer.cpp).
+
+### Verified native loads
+
+As of October 16, 2026, controller-only profiles first use the native profile
+loader, wait 0.75 seconds for hardware settling, and verify both SDK state and
+physical ENE registers. When those checks pass, the adapter skips the redundant
+serialized replay. If verification reports a mismatch, it retains the original
+serialized recovery path. With the corrected 16-LED motherboard profiles,
+Torii Blue completed in 2.2 seconds (previously 12.5), White in 1.0 second,
+and Off in 2.0 seconds during live verification. These times include verification;
+the native load happens before the settling and verification steps.
+
 The installed compatibility layer keeps JSON profiles as the source of truth
 and applies each matched controller through the persistent SDK server. It:
 
