@@ -197,8 +197,12 @@ described in the [OpenRGB SDK source](https://github.com/CalcProgrammer1/OpenRGB
 ### Verified native loads
 
 As of October 16, 2026, controller-only profiles first use the native profile
-loader, wait 0.75 seconds for hardware settling, and verify both SDK state and
-physical ENE registers. When those checks pass, the adapter skips the redundant
+loader, wait 0.75 seconds for hardware settling, explicitly rewrite every
+populated zone on non-ENE controllers, and verify both SDK state and physical
+ENE registers. The synchronous zone writes are required for the IT5711's ARGB
+headers: native loading can leave the headers off while the SDK cache reports
+the correct colors. SDK readback does not physically verify those headers.
+When those checks pass, the adapter skips the redundant
 serialized replay. If verification reports a mismatch, it retains the original
 serialized recovery path. With the corrected 16-LED motherboard profiles,
 Torii Blue completed in 2.2 seconds (previously 12.5), White in 1.0 second,

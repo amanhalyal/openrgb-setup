@@ -163,6 +163,27 @@ inhibition and was stopped at the user's request; the normal 600/660-second
 settings and 60-second locked timeout were restored. A full physical keyboard
 wake cycle remains to be observed during normal inactivity.
 
+## Investigation record: 2026-10-16 — ARGB headers dark after wake crossfade
+
+After inactivity, the Torii Blue restore crossfade illuminated all devices, but
+the fan and AIO headers went dark when the final native Static profile loaded.
+The RAM and onboard motherboard lighting stayed on. The journal showed one Off
+and one restore, without a later Off operation. SDK readback reported the
+expected Static colors even while the headers were physically dark.
+
+The native-load fast path verified physical ENE registers but trusted the
+motherboard's SDK cache. Reapplying the motherboard through the original
+serialized write path restored all lights, as confirmed visually by the user.
+The adapter now finishes every native controller-only load with synchronous
+zone writes on non-ENE controllers after the mode-settling interval. This
+explicitly programs both populated ARGB headers and the onboard zones before
+accepting the restore. Native-load failures still use serialized recovery.
+
+The corrected adapter was tested with Off followed by the actual
+`pre-headless.orp` snapshot, without changing display power or locking the
+session. RAM hardware verification and eleven regression tests passed, and
+the user confirmed the fan and AIO lights remained on after restoration.
+
 ## OpenRGB 1.0 profile migration and idle-off failure
 
 On 2026-09-12, OpenRGB was upgraded from `1.0rc3-3.1` to `1.0-2.1`. The new

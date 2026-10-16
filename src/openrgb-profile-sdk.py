@@ -584,6 +584,13 @@ def apply_controller_profile(client, profile, operations):
     if profile_name in client.profile_names():
         client.load_profile(profile_name)
         time.sleep(HARDWARE_SETTLE_SECONDS)
+        # Native loading can update the IT5711 cache/onboard LEDs while its
+        # ARGB headers retain the previous Off state. SDK readback cannot
+        # detect that. Finish non-ENE controllers with synchronous zone writes
+        # after mode settling, including when restoring an idle snapshot.
+        for index, saved, _, mode, colors, _ in operations:
+            if ene_target(saved, mode, colors) is None:
+                write_transition_colors(client, index, saved, colors)
         try:
             verify_loaded_state(client, operations)
         except ValueError as error:

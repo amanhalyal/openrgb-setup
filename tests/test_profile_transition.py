@@ -109,6 +109,31 @@ class TransitionTests(unittest.TestCase):
         self.assertEqual(json.loads(upload.args[2].rstrip(b'\0'))['controllers'], [])
         sleep.assert_not_called()
 
+    def test_native_static_restore_writes_argb_headers_before_verification(self):
+        client = Mock()
+        client.profile_names.return_value = ['tori-blue']
+        operations = adapter.plan(self.profile, self.live)
+        recorder = Mock()
+        with patch.object(adapter, 'write_transition_colors') as write, \
+                patch.object(adapter, 'verify_loaded_state') as verify, \
+                patch.object(adapter.time, 'sleep'):
+            recorder.attach_mock(write, 'write')
+            recorder.attach_mock(verify, 'verify')
+            adapter.apply_controller_profile(client, self.profile, operations)
+        motherboard = operations[-1]
+        write.assert_called_once_with(client, motherboard[0], motherboard[1], motherboard[4])
+        self.assertEqual([call[0] for call in recorder.mock_calls], ['write', 'verify'])
+
+    def test_native_mismatch_keeps_serialized_recovery(self):
+        client = Mock()
+        client.profile_names.return_value = ['tori-blue']
+        operations = adapter.plan(self.profile, self.live)
+        with patch.object(adapter, 'write_transition_colors'), \
+                patch.object(adapter, 'verify_loaded_state', side_effect=ValueError('mismatch')), \
+                patch.object(adapter.time, 'sleep'), patch.object(adapter, 'apply') as recover:
+            adapter.apply_controller_profile(client, self.profile, operations)
+        recover.assert_called_once_with(client, operations)
+
 
 if __name__ == '__main__':
     unittest.main()
