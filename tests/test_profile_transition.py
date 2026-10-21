@@ -87,6 +87,33 @@ class TransitionTests(unittest.TestCase):
         adapter.write_transition_colors(client, 0, saved, saved['colors'], onboard_static=True)
         self.assertEqual([call.args[1] for call in client.request.call_args_list], [1051])
 
+    def test_off_endpoint_latches_static_black_on_populated_fan_aio_and_onboard_zones(self):
+        client = Mock()
+        saved = copy.deepcopy(self.live[-1])
+        adapter.write_transition_colors(client, 2, saved, [0] * len(saved['colors']),
+                                        onboard_static=True, latch_static_black=True)
+        modes = [call for call in client.request.call_args_list if call.args[1] == 1103]
+        self.assertEqual(len(modes), 4)
+        zones = []
+        for call in modes:
+            reader = adapter.Reader(call.args[2])
+            reader.number()
+            zones.append(reader.number('i'))
+            reader.number('i')
+            self.assertEqual(reader.mode()['colors'], [0])
+        self.assertEqual(zones, [0, 1, 3, 4])
+
+    def test_black_latch_is_only_used_at_final_off_frame_and_aio_is_written_first(self):
+        operations = adapter.plan(self.profile, self.live)
+        targets = {op[0]: [0] * len(op[4]) for op in operations}
+        with patch.object(adapter, 'write_transition_colors') as write, \
+                patch.object(adapter.time, 'monotonic', side_effect=[0, 0, 0, 1, 1]), \
+                patch.object(adapter.time, 'sleep'):
+            adapter.crossfade(Mock(), operations, targets, .8)
+        self.assertEqual(write.call_args_list[0].args[1], operations[-1][0])
+        self.assertFalse(any(call.kwargs['latch_static_black'] for call in write.call_args_list[:3]))
+        self.assertTrue(all(call.kwargs['latch_static_black'] for call in write.call_args_list[3:]))
+
     def test_bridge_preserves_original_profiles_and_canonical_layout(self):
         original = copy.deepcopy(self.profile)
         bridge, operations, targets = adapter.transition_profile(self.profile, self.live)

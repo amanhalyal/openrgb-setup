@@ -387,7 +387,7 @@ def transition_profile(profile, live):
     return bridge, plan(bridge, live), targets
 
 
-def write_transition_colors(client, index, saved, colors, onboard_static=False):
+def write_transition_colors(client, index, saved, colors, onboard_static=False, latch_static_black=False):
     # UPDATEZONELEDS takes the device mutex and performs its hardware write
     # before ACK. UPDATELEDS merely queues a background write, so its ACK
     # cannot safely pace a fade or precede physical register verification.
@@ -401,26 +401,34 @@ def write_transition_colors(client, index, saved, colors, onboard_static=False):
             # unlike its addressable fan headers. Explicitly update that
             # engine's Static color during the fade; changing only the Direct
             # LED buffer can leave the physical light on the previous color.
-            if (onboard_static and zone.get('type') == 0 and count == 1
-                    and 'IT5711' in saved.get('description', '')):
+            onboard = onboard_static and zone.get('type') == 0 and count == 1
+            black_endpoint = latch_static_black and not any(colors[offset:offset + count])
+            if ((onboard or black_endpoint) and 'IT5711' in saved.get('description', '')):
                 static_index = next((i for i, mode in enumerate(zone.get('modes', []))
                                      if mode['name'] == 'Static' and mode['color_mode'] == 2), None)
                 if static_index is None:
                     raise ValueError(f"Onboard fade needs Static mode: {saved['name']}/{zone['name']}")
-                static = dict(zone['modes'][static_index], colors=[colors[offset]])
+                static = dict(zone['modes'][static_index], colors=[0 if black_endpoint else colors[offset]])
                 data = pack('ii', zone_index, static_index) + mode_bytes(static)
                 client.request(index, 1103, pack('I', len(data) + 4) + data, ack=True)
         offset += count
 
 
 def crossfade(client, operations, targets, seconds):
+    # Send the fan/AIO endpoint before slower DIMM work in the same frame.
+    operations = sorted(operations, key=lambda op: 'IT5711' not in op[1].get('description', ''))
     start = time.monotonic()
     frames = 0
     while True:
         progress = min(1.0, (time.monotonic() - start) / seconds)
         for index, saved, _, _, colors, _ in operations:
             blended = blend_colors(colors, targets[index], progress)
-            write_transition_colors(client, index, saved, blended, onboard_static=True)
+            # IT5711 Direct black can leave the AIO's Static engine displaying
+            # its previous blue. Latch true Static black at the OFF endpoint,
+            # before final native-profile loading/settling/ENE verification.
+            latch_black = progress == 1.0 and not any(targets[index])
+            write_transition_colors(client, index, saved, blended, onboard_static=True,
+                                    latch_static_black=latch_black)
         frames += 1
         if progress == 1.0:
             break

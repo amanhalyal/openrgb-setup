@@ -366,3 +366,14 @@ but it is not part of this idle-control path. Citadel/Legion remain the
 backend/control plane. See
 `firestick-homelab-setup-and-scenarios.md` for the wallboard, streamer-view,
 3440x1440 ultrawide, and VGA-only monitor scenarios.
+
+## AIO delayed off during a fade
+
+The IT5711 ARGB_V2_2 header drives the AIO. Zone color-buffer writes alone
+can leave its previous Static color active until final profile cleanup.
+The last black fade frame now explicitly latches Static black for every
+populated IT5711 zone, including both ARGB headers. IT5711 writes precede
+RAM writes in each frame. Normal colored frames keep the existing fade path.
+Unit tests cover the final-frame latch and ordering; SDK readback confirmed
+all controllers black and successful restore. Physical timing still needs a
+visual check; SDK readback cannot confirm when the LEDs actually went dark.
