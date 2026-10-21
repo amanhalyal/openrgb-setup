@@ -167,6 +167,12 @@ profile is loaded and its animation starts. The outgoing animation pauses
 during the blend. Preparation and final verification add time beyond the
 0.8-second visible blend.
 
+During the blend, IT5711 single-LED onboard zones receive explicit synchronous
+Static zone-mode color updates on each frame. Their built-in effect engine can
+retain its previous visible color when only the Direct LED buffer is updated.
+ARGB fan headers and ENE RAM continue using synchronous LED-buffer writes.
+The destination profile restores its saved zone modes after the blend.
+
 For normal wallpaper switches, already-configured Direct controllers are omitted
 from the temporary profile. This removes the unconditional 0.75-second pause;
 measured preparation now takes 0.13–0.25 seconds. Waking from hardware Off still

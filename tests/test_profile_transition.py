@@ -31,6 +31,24 @@ class TransitionTests(unittest.TestCase):
         self.assertEqual(adapter.blend_colors([0xFF0000], [0xFFFFFF], .5), [0xFF8080])
         self.assertEqual(adapter.blend_colors([0xFF0000], [0xFFFFFF], 1), [0xFFFFFF])
 
+    def test_register_uploads_profile_without_loading_or_changing_source(self):
+        original = copy.deepcopy(self.profile)
+        client = Mock()
+        client.profile_names.return_value = [self.profile['profile_name']]
+        adapter.register_profile(client, self.profile, self.live)
+        self.assertEqual(self.profile, original)
+        self.assertEqual([call.args[1] for call in client.request.call_args_list], [52, 154])
+        uploaded = json.loads(client.request.call_args_list[-1].args[2].rstrip(b'\0'))
+        self.assertEqual(uploaded, original)
+        client.load_profile.assert_not_called()
+
+    def test_register_rejects_wrong_layout_before_upload(self):
+        client = Mock()
+        self.profile['controllers'][0]['name'] = 'missing hardware'
+        with self.assertRaises(ValueError):
+            adapter.register_profile(client, self.profile, self.live)
+        client.request.assert_not_called()
+
     def test_idle_fade_reaches_exact_black(self):
         self.assertEqual(adapter.blend_colors([0xFFFFFF], [0], .5), [0x808080])
         self.assertEqual(adapter.blend_colors([0xFFFFFF], [0], 1), [0])
@@ -44,6 +62,30 @@ class TransitionTests(unittest.TestCase):
         self.assertEqual(struct.unpack('<IIHII', first.args[2]),
                          (18, 0, 2, 0x123456, 0x654321))
         self.assertEqual(struct.unpack('<IIHI', second.args[2]), (14, 2, 1, 0xABCDEF))
+
+    def test_onboard_fade_updates_static_engine_without_changing_fan_modes(self):
+        client = Mock()
+        saved = copy.deepcopy(self.live[-1])
+        original = copy.deepcopy(saved)
+        colors = [0x123456] * len(saved['colors'])
+        adapter.write_transition_colors(client, saved['sdk_id'], saved, colors, onboard_static=True)
+        modes = [call for call in client.request.call_args_list if call.args[1] == 1103]
+        self.assertEqual(len(modes), 2)
+        for call, expected_zone in zip(modes, [3, 4]):
+            reader = adapter.Reader(call.args[2])
+            self.assertEqual(reader.number(), len(call.args[2]))
+            self.assertEqual(reader.number('i'), expected_zone)
+            static_index = reader.number('i')
+            self.assertEqual(saved['zones'][expected_zone]['modes'][static_index]['name'], 'Static')
+            mode = reader.mode()
+            self.assertEqual(mode['colors'], [0x123456])
+        self.assertEqual(saved, original)
+
+    def test_ram_fade_never_queues_mode_changes_per_frame(self):
+        client = Mock()
+        saved = self.live[0]
+        adapter.write_transition_colors(client, 0, saved, saved['colors'], onboard_static=True)
+        self.assertEqual([call.args[1] for call in client.request.call_args_list], [1051])
 
     def test_bridge_preserves_original_profiles_and_canonical_layout(self):
         original = copy.deepcopy(self.profile)

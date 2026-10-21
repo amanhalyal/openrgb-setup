@@ -387,7 +387,7 @@ def transition_profile(profile, live):
     return bridge, plan(bridge, live), targets
 
 
-def write_transition_colors(client, index, saved, colors):
+def write_transition_colors(client, index, saved, colors, onboard_static=False):
     # UPDATEZONELEDS takes the device mutex and performs its hardware write
     # before ACK. UPDATELEDS merely queues a background write, so its ACK
     # cannot safely pace a fade or precede physical register verification.
@@ -397,6 +397,19 @@ def write_transition_colors(client, index, saved, colors):
         if count:
             data = pack('IH', zone_index, count) + pack('I' * count, *colors[offset:offset + count])
             client.request(index, 1051, pack('I', len(data) + 4) + data, ack=True)
+            # IT5711's single onboard LEDs use the built-in effect engine,
+            # unlike its addressable fan headers. Explicitly update that
+            # engine's Static color during the fade; changing only the Direct
+            # LED buffer can leave the physical light on the previous color.
+            if (onboard_static and zone.get('type') == 0 and count == 1
+                    and 'IT5711' in saved.get('description', '')):
+                static_index = next((i for i, mode in enumerate(zone.get('modes', []))
+                                     if mode['name'] == 'Static' and mode['color_mode'] == 2), None)
+                if static_index is None:
+                    raise ValueError(f"Onboard fade needs Static mode: {saved['name']}/{zone['name']}")
+                static = dict(zone['modes'][static_index], colors=[colors[offset]])
+                data = pack('ii', zone_index, static_index) + mode_bytes(static)
+                client.request(index, 1103, pack('I', len(data) + 4) + data, ack=True)
         offset += count
 
 
@@ -407,7 +420,7 @@ def crossfade(client, operations, targets, seconds):
         progress = min(1.0, (time.monotonic() - start) / seconds)
         for index, saved, _, _, colors, _ in operations:
             blended = blend_colors(colors, targets[index], progress)
-            write_transition_colors(client, index, saved, blended)
+            write_transition_colors(client, index, saved, blended, onboard_static=True)
         frames += 1
         if progress == 1.0:
             break
@@ -539,6 +552,8 @@ def main():
     parser.add_argument('profile', nargs='?')
     parser.add_argument('--inspect', action='store_true')
     parser.add_argument('--check', action='store_true')
+    parser.add_argument('--register', action='store_true',
+                        help='register profile JSON with the server without applying it')
     parser.add_argument('--fade-seconds', type=float,
                         default=os.environ.get('OPENRGB_FADE_SECONDS', '0'),
                         help='crossfade duration, 0 disables (default: OPENRGB_FADE_SECONDS or 0)')
@@ -556,6 +571,9 @@ def main():
                 return
             with open(args.profile) as source:
                 profile = json.load(source)
+            if args.register:
+                register_profile(client, profile, live)
+                return
             if profile.get('plugins'):
                 profile_name = profile.get('profile_name')
                 if not profile_name or profile_name not in client.profile_names():
@@ -574,6 +592,23 @@ def main():
                     apply_controller_profile(client, profile, operations)
         finally:
             client.sock.close()
+
+
+def register_profile(client, profile, live):
+    """Upload a saved profile without changing controller or plugin state."""
+    name = profile.get('profile_name')
+    if not name or not re.fullmatch(r'[A-Za-z0-9._-]+', name):
+        raise ValueError('Invalid profile name')
+    layout = copy.deepcopy(profile)
+    layout.pop('plugins', None)
+    layout.pop('base_color', None)
+    layout['base_color_enabled'] = False
+    plan(layout, live)
+    client.request(0, 52, pack('I', 1 << 16), ack=True)
+    client.request(0, 154, json.dumps(profile).encode() + b'\0', ack=True)
+    if name not in client.profile_names():
+        raise ValueError(f'OpenRGB did not register profile: {name}')
+    print(f'Registered OpenRGB profile: {name}; no controller writes')
 
 
 def apply_controller_profile(client, profile, operations):

@@ -34,18 +34,69 @@ def rgb_to_lab(color: tuple[int, int, int]) -> tuple[float, float, float]:
 
 
 def distance(left: tuple[float, float, float], right: tuple[float, float, float]) -> float:
-    return math.sqrt(sum((a - b) ** 2 for a, b in zip(left, right)))
+    # Favor different hues over shadows/highlights of the same color.
+    return math.sqrt(0.05 * (left[0] - right[0]) ** 2
+                     + (left[1] - right[1]) ** 2 + (left[2] - right[2]) ** 2)
 
 
-def led_adjust(color: tuple[int, int, int], minimum_brightness: int) -> tuple[int, int, int]:
+def wallpaper_tuning(image: Image.Image) -> dict[str, float]:
+    """Estimate visual intensity, not semantic style, from a small RGB image."""
+    sample = image.copy()
+    sample.thumbnail((96, 96), Image.Resampling.LANCZOS)
+    pixels = [sample.getpixel((x, y)) for y in range(sample.height) for x in range(sample.width)]
+    total_weight = 0.0
+    saturation_sum = 0.0
+    lightness = []
+    for color in pixels:
+        _, saturation, value = colorsys.rgb_to_hsv(*(channel / 255.0 for channel in color))
+        # Dark backgrounds should not drown out bright neon accents. Squared
+        # value also stops almost-black color noise from setting the mood.
+        weight = value ** 2
+        total_weight += weight
+        saturation_sum += saturation * weight
+        lightness.append(rgb_to_lab(color)[0] / 100.0)
+    colorfulness = saturation_sum / total_weight if total_weight else 0.0
+    lightness.sort()
+    contrast = lightness[int((len(lightness) - 1) * 0.9)] - lightness[int((len(lightness) - 1) * 0.1)]
+
+    # Adjacent color changes distinguish flat art from busy, textured scenes.
+    changes = []
+    for y in range(sample.height):
+        for x in range(sample.width):
+            index = y * sample.width + x
+            for neighbor in (index + 1 if x + 1 < sample.width else None,
+                             index + sample.width if y + 1 < sample.height else None):
+                if neighbor is not None:
+                    changes.append(max(abs(a - b) for a, b in zip(pixels[index], pixels[neighbor])) / 255.0)
+    detail = min(1.0, 10.0 * sum(changes) / len(changes)) if changes else 0.0
+    chromatic = min(1.0, max(0.0, (colorfulness - 0.12) / 0.63))
+    chromatic = chromatic * chromatic * (3.0 - 2.0 * chromatic)
+    # Even soft palettes need a little chroma on LEDs to avoid looking white.
+    baseline = 0.18 * min(1.0, colorfulness / 0.12)
+    boost = baseline + 0.47 * chromatic * (0.45 + 0.30 * contrast + 0.25 * detail)
+    return dict(saturation_boost=boost, colorfulness=colorfulness,
+                contrast=contrast, detail=detail, brightness_lift=0.8 * (1.0 - chromatic))
+
+
+def led_adjust(color: tuple[int, int, int], minimum_brightness: int,
+               saturation_boost: float = 0.0,
+               brightness_lift: float = 0.0) -> tuple[int, int, int]:
     red, green, blue = (value / 255.0 for value in color)
     hue, saturation, value = colorsys.rgb_to_hsv(red, green, blue)
+    # Retain white in soft images; remove more of it for vivid, busy images.
+    # Protect near-neutral pixels from having tiny color casts amplified.
+    neutral_guard = min(1.0, saturation / 0.2) ** 2
+    saturation += (1.0 - saturation) * saturation_boost * neutral_guard
+    # Soft colors should be luminous pastels rather than dim gray shades.
+    # Neon images keep their original brightness differences.
+    value += max(0.0, 0.88 - value) * brightness_lift
     value = max(value, minimum_brightness / 255.0)
     adjusted = colorsys.hsv_to_rgb(hue, saturation, value)
     return tuple(round(channel * 255) for channel in adjusted)
 
 
-def extract_palette(path: Path, count: int, minimum_brightness: int) -> list[tuple[int, int, int]]:
+def extract_palette(path: Path, count: int, minimum_brightness: int,
+                    tuning: dict[str, float] | None = None) -> list[tuple[int, int, int]]:
     with Image.open(path) as source:
         image = ImageOps.exif_transpose(source)
         if image.mode in {"RGBA", "LA"} or "transparency" in image.info:
@@ -55,7 +106,11 @@ def extract_palette(path: Path, count: int, minimum_brightness: int) -> list[tup
         else:
             image = image.convert("RGB")
         image.thumbnail((320, 320), Image.Resampling.LANCZOS)
-        quantized = image.quantize(colors=32, method=Image.Quantize.MEDIANCUT)
+        analysis = wallpaper_tuning(image)
+        if tuning is not None:
+            tuning.update(analysis)
+        # Keep small accents even when a flat neutral background fills the frame.
+        quantized = image.quantize(colors=128, method=Image.Quantize.MEDIANCUT)
         raw = quantized.getpalette()
         histogram = quantized.getcolors() or []
 
@@ -68,30 +123,43 @@ def extract_palette(path: Path, count: int, minimum_brightness: int) -> list[tup
     if not candidates:
         raise ValueError("the wallpaper did not contain any readable colors")
 
-    maximum_population = candidates[0][0]
-    selected = [max(candidates, key=lambda item: item[0] * (0.35 + item[2][0] / 100.0))]
+    # Dark foregrounds and nearly neutral highlights are common in photos, but
+    # make poor accent colors for a wave. Prefer the image's brighter chromatic
+    # colors, retaining the full pool for dark or monochrome images.
+    brightest = max(max(item[1]) for item in candidates)
+    accents = [
+        item for item in candidates
+        if max(item[1]) >= brightest * 0.55
+        and colorsys.rgb_to_hsv(*(channel / 255.0 for channel in item[1]))[1] >= 0.2
+    ]
+    pool = accents if len(accents) >= count else candidates
+    maximum_population = max(item[0] for item in pool)
+    selected = [max(pool, key=lambda item: item[0] * (0.35 + item[2][0] / 100.0))]
     while len(selected) < count:
-        remaining = [candidate for candidate in candidates if candidate not in selected]
+        remaining = [candidate for candidate in pool if candidate not in selected]
         if not remaining:
             break
         selected.append(
             max(
                 remaining,
                 key=lambda item: math.sqrt(item[0] / maximum_population)
+                * (max(item[1]) / max(brightest, 1))
                 * min(distance(item[2], chosen[2]) for chosen in selected),
             )
         )
 
     palette: list[tuple[int, int, int]] = []
     for _, color, _ in selected:
-        adjusted = led_adjust(color, minimum_brightness)
+        adjusted = led_adjust(color, minimum_brightness, analysis["saturation_boost"],
+                              analysis["brightness_lift"])
         if adjusted not in palette:
             palette.append(adjusted)
 
     for _, color, _ in candidates:
         if len(palette) >= count:
             break
-        adjusted = led_adjust(color, minimum_brightness)
+        adjusted = led_adjust(color, minimum_brightness, analysis["saturation_boost"],
+                              analysis["brightness_lift"])
         if adjusted not in palette:
             palette.append(adjusted)
 
@@ -103,6 +171,30 @@ def extract_palette(path: Path, count: int, minimum_brightness: int) -> list[tup
 def pack_openrgb(color: tuple[int, int, int]) -> int:
     red, green, blue = color
     return red | green << 8 | blue << 16
+
+
+def seed_gradient_frame(profile: dict, palette: list[tuple[int, int, int]]) -> None:
+    """Save a wallpaper-colored frame for native loading and crossfade targets.
+
+    The Effects Plugin palette alone does not replace the template's per-LED
+    colors. Those colors are displayed before animation starts and are also
+    the destination used by the profile adapter's crossfade.
+    """
+    for controller in profile["controllers"]:
+        colors = []
+        for zone in controller["zones"]:
+            count = zone["leds_count"]
+            for index in range(count):
+                position = index * len(palette) / count
+                left = int(position)
+                fraction = position - left
+                start = palette[left % len(palette)]
+                end = palette[(left + 1) % len(palette)]
+                color = tuple(round(a + (b - a) * fraction) for a, b in zip(start, end))
+                colors.append(pack_openrgb(color))
+        if len(colors) != len(controller["colors"]):
+            raise ValueError(f"zone/LED count mismatch: {controller['name']}")
+        controller["colors"] = colors
 
 
 def build_profile(template_path: Path, output_path: Path, palette: list[tuple[int, int, int]]) -> int:
@@ -123,6 +215,8 @@ def build_profile(template_path: Path, output_path: Path, palette: list[tuple[in
         settings["spread"] = 100
         effect["FPS"] = 60
         effect["AutoStart"] = True
+
+    seed_gradient_frame(profile, palette)
 
     profile_name = output_path.stem
     if not re.fullmatch(r"[A-Za-z0-9._-]+", profile_name):
@@ -164,11 +258,15 @@ def main() -> int:
         parser.error("--minimum-brightness must be between 0 and 255")
 
     try:
-        palette = extract_palette(args.wallpaper, args.colors, args.minimum_brightness)
+        tuning: dict[str, float] = {}
+        palette = extract_palette(args.wallpaper, args.colors, args.minimum_brightness, tuning)
         effects = build_profile(args.template, args.output, palette)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
 
+    print(f"Wallpaper tuning: saturation boost {tuning['saturation_boost']:.0%}; "
+          f"colorfulness {tuning['colorfulness']:.0%}, contrast {tuning['contrast']:.0%}, "
+          f"detail {tuning['detail']:.0%}")
     print("Palette: " + " -> ".join(f"#{r:02X}{g:02X}{b:02X}" for r, g, b in palette))
     print(f"Generated {args.output} with {effects} Custom Gradient Wave effect(s)")
     return 0

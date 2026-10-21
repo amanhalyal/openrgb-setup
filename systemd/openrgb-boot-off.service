@@ -1,0 +1,14 @@
+[Unit]
+Description=Turn off RGB lighting before the login screen
+RequiresMountsFor=/home/aman/openrgb
+After=systemd-udev-trigger.service
+Before=greetd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/usr/local/libexec/openrgb-shutdown-off --boot
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

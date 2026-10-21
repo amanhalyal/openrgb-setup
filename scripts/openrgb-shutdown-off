@@ -3,6 +3,12 @@
 
 set -euo pipefail
 
+operation="${1:---shutdown}"
+case "$operation" in
+    --boot|--shutdown) ;;
+    *) printf 'Usage: %s [--boot|--shutdown]\n' "$0" >&2; exit 2 ;;
+esac
+
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 repository_dir="$(cd -- "$(dirname -- "$script_path")/.." && pwd)"
 runtime_dir=/run/openrgb-shutdown
@@ -21,6 +27,13 @@ trap cleanup EXIT INT TERM
 mkdir -p "$runtime_dir"
 exec 9>"$runtime_dir/hardware.lock"
 /usr/bin/flock -w 10 9
+
+# The boot service runs before greetd can launch a desktop. Refuse a manual
+# start during a live session rather than taking hardware from its server.
+if [[ "$operation" == --boot ]] && /usr/bin/pgrep -x openrgb >/dev/null; then
+    printf 'Boot RGB Off refused: OpenRGB is already running\n' >&2
+    exit 1
+fi
 
 # Use the Off profile as the single source for both controller geometry and
 # the state to apply. The repository's older Configuration.json can have
@@ -42,14 +55,15 @@ configuration['profile_name'] = 'Controller Configuration'
 Path(sys.argv[2]).write_text(json.dumps(configuration, indent=4) + '\n')
 PY
 
-# Shutdown may begin while the desktop SDK server still owns the devices.
-# Close every OpenRGB instance before starting one isolated server.
-/usr/bin/pkill -TERM -x openrgb 2>/dev/null || true
-for _ in {1..20}; do
-    /usr/bin/pgrep -x openrgb >/dev/null 2>&1 || break
-    /usr/bin/sleep 0.1
-done
-/usr/bin/pkill -KILL -x openrgb 2>/dev/null || true
+if [[ "$operation" == --shutdown ]]; then
+    # Shutdown may begin while the desktop server still owns the devices.
+    /usr/bin/pkill -TERM -x openrgb 2>/dev/null || true
+    for _ in {1..20}; do
+        /usr/bin/pgrep -x openrgb >/dev/null 2>&1 || break
+        /usr/bin/sleep 0.1
+    done
+    /usr/bin/pkill -KILL -x openrgb 2>/dev/null || true
+fi
 
 QT_QPA_PLATFORM=offscreen /usr/bin/openrgb \
     --server --server-port "$server_port" --noautoconnect \
@@ -71,7 +85,7 @@ for _ in {1..40}; do
     /usr/bin/sleep 0.5
 done
 if (( ready == 0 )); then
-    printf 'Shutdown OpenRGB server did not detect the saved controller layout\n' >&2
+    printf 'System OpenRGB server did not detect the saved controller layout\n' >&2
     /usr/bin/python3 "$repository_dir/src/openrgb-profile-sdk.py" \
         --check "$profile" >&2 || true
     cat "$runtime_dir/server.log" >&2

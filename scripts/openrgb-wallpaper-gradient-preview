@@ -8,7 +8,7 @@ script_dir="$(dirname -- "$script_path")"
 repository_dir="$(cd -- "$script_dir/.." && pwd)"
 profile_dir="${OPENRGB_PROFILE_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/OpenRGB/profiles}"
 template="$repository_dir/profiles/cathedral-inferno.json"
-output="$profile_dir/wallpaper-gradient-preview.json"
+output=""
 wallpaper=""
 colors=3
 minimum_brightness=72
@@ -23,7 +23,7 @@ With no WALLPAPER argument, use Noctalia's current wallpaper.
 
 Options:
   --template PROFILE.json       Custom Gradient Wave profile used for layout
-  --output PROFILE.json         Generated preview profile location
+  --output PROFILE.json         Output (default: WALLPAPER-STEM-gradient.json)
   --colors 2|3|4|5              Number of extracted colors (default: 3)
   --minimum-brightness 0-255    Raise very dark colors for LEDs (default: 72)
   --no-apply                    Generate and print the palette without applying it
@@ -92,6 +92,11 @@ fi
 
 wallpaper="$(readlink -f "$wallpaper")"
 template="$(readlink -f "$template")"
+if [[ -z "$output" ]]; then
+    wallpaper_name="${wallpaper##*/}"
+    profile_stem="$(LC_ALL=C sed 's/[^A-Za-z0-9._-]/_/g' <<< "${wallpaper_name%.*}")"
+    output="$profile_dir/${profile_stem}-gradient.json"
+fi
 mkdir -p -- "$(dirname -- "$output")"
 
 runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -112,6 +117,10 @@ if (( apply == 0 )); then
     exit 0
 fi
 
+# Register the new name with the running server without loading it. OpenRGB
+# otherwise only knows profiles discovered when its GUI was started.
+/usr/bin/systemctl --user start app-openrgb@autostart.service >/dev/null
+/usr/bin/python3 "$repository_dir/src/openrgb-profile-sdk.py" --register "$output"
 "$script_dir/openrgb-apply-profile" "$output"
 
 # Keep idle restore and the next wallpaper-change event aware that the preview,

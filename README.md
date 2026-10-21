@@ -120,10 +120,26 @@ openrgb-wallpaper-gradient-preview ~/Wallpapers/example.png
 ```
 
 The command extracts three distinct dominant colors, closes the gradient by
-repeating the first color, generates the disposable
-`wallpaper-gradient-preview.json` profile, and applies it through the existing
+repeating the first color, generates a separate
+`WALLPAPER-STEM-gradient.json` profile for each wallpaper, and applies it through the existing
 serialized profile adapter. Use `--no-apply` to inspect the palette and profile
 without changing the lights.
+Generating another wallpaper leaves earlier wallpapers' profiles intact;
+generating the same wallpaper updates its profile. Use `--output` to choose
+another filename. New profiles are registered with the running server before
+application, without needing an OpenRGB restart.
+
+Saturation adapts to the wallpaper's colorfulness, lightness contrast, and local
+detail. Soft or minimal images retain more white for muted LED colors; vivid,
+busy images receive a stronger saturation boost. Soft palettes also receive a
+brightness lift and a modest saturation boost so pastels stay luminous and
+colored on LEDs. Hues are preserved; vivid images retain their brightness
+contrast apart from the configured minimum brightness. This is an image
+heuristic, not a semantic style detector or a monitor white-point calibration.
+The command prints the tuning measurements alongside the palette.
+Generated profiles also save a per-LED frame from that same palette. Wallpaper
+crossfades blend toward these colors before the animation starts, rather than
+briefly showing the template profile's saved colors.
 
 ## Adding a wallpaper profile
 
