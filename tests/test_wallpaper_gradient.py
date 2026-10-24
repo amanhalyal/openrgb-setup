@@ -82,6 +82,21 @@ class WallpaperGradientTests(unittest.TestCase):
             self.assertGreater(after[1], before[1])
             self.assertLess(after[1], 1)
 
+    def test_grade_preserves_neutrals_and_clamps_value(self):
+        for level in (0, 40, 128, 230, 255):
+            adjusted = gradient.led_adjust((level, level, level), 72, 0.6,
+                                           extra_saturation=0.5, contrast=2.0)
+            self.assertEqual(len(set(adjusted)), 1)
+            self.assertTrue(all(72 <= channel <= 255 for channel in adjusted))
+
+    def test_extra_saturation_preserves_hue_and_value(self):
+        color = (93, 104, 179)
+        adjusted = gradient.led_adjust(color, 72, extra_saturation=0.5)
+        before, after = colorsys.rgb_to_hsv(*color), colorsys.rgb_to_hsv(*adjusted)
+        self.assertAlmostEqual(before[0], after[0], delta=0.003)
+        self.assertEqual(max(adjusted), max(color))
+        self.assertGreater(after[1], before[1])
+
     def test_palette_uses_image_tuning_and_reports_it(self):
         image = Image.new('RGB', (96, 96), (220, 205, 230))
         image.paste((190, 210, 230), (0, 0, 32, 96))

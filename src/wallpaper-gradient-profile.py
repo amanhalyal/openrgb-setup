@@ -75,28 +75,35 @@ def wallpaper_tuning(image: Image.Image) -> dict[str, float]:
     baseline = 0.18 * min(1.0, colorfulness / 0.12)
     boost = baseline + 0.47 * chromatic * (0.45 + 0.30 * contrast + 0.25 * detail)
     return dict(saturation_boost=boost, colorfulness=colorfulness,
-                contrast=contrast, detail=detail, brightness_lift=0.8 * (1.0 - chromatic))
+                contrast=contrast, detail=detail, brightness_lift=0.5 * (1.0 - chromatic))
 
 
 def led_adjust(color: tuple[int, int, int], minimum_brightness: int,
                saturation_boost: float = 0.0,
-               brightness_lift: float = 0.0) -> tuple[int, int, int]:
+               brightness_lift: float = 0.0,
+               extra_saturation: float = 0.0,
+               contrast: float = 1.0) -> tuple[int, int, int]:
     red, green, blue = (value / 255.0 for value in color)
     hue, saturation, value = colorsys.rgb_to_hsv(red, green, blue)
     # Retain white in soft images; remove more of it for vivid, busy images.
     # Protect near-neutral pixels from having tiny color casts amplified.
     neutral_guard = min(1.0, saturation / 0.2) ** 2
     saturation += (1.0 - saturation) * saturation_boost * neutral_guard
+    saturation = min(1.0, saturation + (1.0 - saturation) * extra_saturation * neutral_guard)
     # Soft colors should be luminous pastels rather than dim gray shades.
     # Neon images keep their original brightness differences.
     value += max(0.0, 0.88 - value) * brightness_lift
+    value = max(0.0, min(1.0, 0.5 + (value - 0.5) * contrast))
     value = max(value, minimum_brightness / 255.0)
     adjusted = colorsys.hsv_to_rgb(hue, saturation, value)
     return tuple(round(channel * 255) for channel in adjusted)
 
 
 def extract_palette(path: Path, count: int, minimum_brightness: int,
-                    tuning: dict[str, float] | None = None) -> list[tuple[int, int, int]]:
+                    tuning: dict[str, float] | None = None,
+                    extra_saturation: float = 0.0,
+                    contrast: float = 1.0,
+                    allow_fewer: bool = False) -> list[tuple[int, int, int]]:
     with Image.open(path) as source:
         image = ImageOps.exif_transpose(source)
         if image.mode in {"RGBA", "LA"} or "transparency" in image.info:
@@ -151,7 +158,7 @@ def extract_palette(path: Path, count: int, minimum_brightness: int,
     palette: list[tuple[int, int, int]] = []
     for _, color, _ in selected:
         adjusted = led_adjust(color, minimum_brightness, analysis["saturation_boost"],
-                              analysis["brightness_lift"])
+                              analysis["brightness_lift"], extra_saturation, contrast)
         if adjusted not in palette:
             palette.append(adjusted)
 
@@ -159,11 +166,11 @@ def extract_palette(path: Path, count: int, minimum_brightness: int,
         if len(palette) >= count:
             break
         adjusted = led_adjust(color, minimum_brightness, analysis["saturation_boost"],
-                              analysis["brightness_lift"])
+                              analysis["brightness_lift"], extra_saturation, contrast)
         if adjusted not in palette:
             palette.append(adjusted)
 
-    if len(palette) < count:
+    if len(palette) < count and not allow_fewer:
         raise ValueError(f"could extract only {len(palette)} distinct colors")
     return palette[:count]
 
@@ -248,6 +255,10 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--colors", type=int, choices=(2, 3, 4, 5), default=3)
     parser.add_argument("--minimum-brightness", type=int, default=72)
+    parser.add_argument("--contrast", type=float, default=1.18,
+                        help="Value contrast grade around mid-gray (1.0-2.0, default 1.18)")
+    parser.add_argument("--saturation", type=float, default=0.12,
+                        help="Extra chroma added on top of the image mood (0.0-0.5, default 0.12)")
     args = parser.parse_args()
 
     if not args.wallpaper.is_file():
@@ -256,10 +267,15 @@ def main() -> int:
         parser.error(f"template is not a file: {args.template}")
     if not 0 <= args.minimum_brightness <= 255:
         parser.error("--minimum-brightness must be between 0 and 255")
+    if not 1.0 <= args.contrast <= 2.0:
+        parser.error("--contrast must be between 1.0 and 2.0")
+    if not 0.0 <= args.saturation <= 0.5:
+        parser.error("--saturation must be between 0.0 and 0.5")
 
     try:
         tuning: dict[str, float] = {}
-        palette = extract_palette(args.wallpaper, args.colors, args.minimum_brightness, tuning)
+        palette = extract_palette(args.wallpaper, args.colors, args.minimum_brightness, tuning,
+                                  args.saturation, args.contrast)
         effects = build_profile(args.template, args.output, palette)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
@@ -267,6 +283,7 @@ def main() -> int:
     print(f"Wallpaper tuning: saturation boost {tuning['saturation_boost']:.0%}; "
           f"colorfulness {tuning['colorfulness']:.0%}, contrast {tuning['contrast']:.0%}, "
           f"detail {tuning['detail']:.0%}")
+    print(f"Applied grade: contrast x{args.contrast:.2f}, extra saturation +{args.saturation:.0%}")
     print("Palette: " + " -> ".join(f"#{r:02X}{g:02X}{b:02X}" for r, g, b in palette))
     print(f"Generated {args.output} with {effects} Custom Gradient Wave effect(s)")
     return 0

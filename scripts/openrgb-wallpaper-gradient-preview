@@ -12,6 +12,8 @@ output=""
 wallpaper=""
 colors=3
 minimum_brightness=72
+contrast=1.18
+saturation=0.12
 apply=1
 
 usage() {
@@ -26,6 +28,8 @@ Options:
   --output PROFILE.json         Output (default: WALLPAPER-STEM-gradient.json)
   --colors 2|3|4|5              Number of extracted colors (default: 3)
   --minimum-brightness 0-255    Raise very dark colors for LEDs (default: 72)
+  --contrast 1.0-2.0            Value contrast grade around mid-gray (default: 1.18)
+  --saturation 0.0-0.5          Extra chroma on top of the image mood (default: 0.12)
   --no-apply                    Generate and print the palette without applying it
   -h, --help                    Show this help
 EOF
@@ -56,6 +60,16 @@ while (( $# )); do
         --minimum-brightness)
             (( $# >= 2 )) || die "--minimum-brightness requires a value"
             minimum_brightness="$2"
+            shift 2
+            ;;
+        --contrast)
+            (( $# >= 2 )) || die "--contrast requires a value"
+            contrast="$2"
+            shift 2
+            ;;
+        --saturation)
+            (( $# >= 2 )) || die "--saturation requires a value"
+            saturation="$2"
             shift 2
             ;;
         --no-apply)
@@ -111,7 +125,9 @@ fi
     --template "$template" \
     --output "$output" \
     --colors "$colors" \
-    --minimum-brightness "$minimum_brightness"
+    --minimum-brightness "$minimum_brightness" \
+    --contrast "$contrast" \
+    --saturation "$saturation"
 
 if (( apply == 0 )); then
     exit 0
